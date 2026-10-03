@@ -95,7 +95,7 @@
 
 ## 6. 次にやること
 
-- [ ] 1. AWS CLIとTerraformの導入、クレデンシャルの確認(読み取りのみ)
+- [x] 1. AWS CLIとTerraformの確認(2026-10-03: WSLのUbuntuに導入済み。AWS CLI 2.36、Terraform 1.15、東京リージョンのIAMユーザーで認証できる)
 - [ ] 2. 自作MCPサーバ(低レベルAPI)と計装つきMCPクライアントを、手元で動かす(検索はfaiss、トレースはSQLite)
 - [ ] 3. llama.cppの速度を測り、エージェントループを手元で組む
 - [ ] 4. Terraform: VPC・RDS(pgvector)・AgentCore・CloudWatch。データ投入と、pgvectorの検索の計測
@@ -107,4 +107,5 @@
 - PCメモリ総量 13.74GB。大きな配列を作る前に空きを確認する
 - 手元のfaissでの検索の実測値はREADMEの「検索についての実測メモ」
 - venv: `.venv/Scripts/python.exe`(システムPythonにはfaissが無い)
-- AWS: 既存アカウント(東京リージョン)、月60ドルの予算アラートあり。このPCには`~/.aws`の設定がある
+- AWS: 既存アカウント(東京リージョン)、月60ドルの予算アラートあり。**AWS CLIとTerraformはWSLのUbuntuから使う**
+  (Windows側には入っていない。クレデンシャルもUbuntu側の`~/.aws`)
