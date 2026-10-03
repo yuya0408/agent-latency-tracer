@@ -1,0 +1,224 @@
+"""Tests for tracing/instrumentation.py + tracing/exporter.py wired together.
+
+These run a synthetic retrieval -> tool-call -> generation pipeline, kept
+independent of system/ here so tracing/'s own span taxonomy and exporter
+can be verified in isolation. The point is to verify the span taxonomy and
+the self-built SQLite exporter persist what they claim to, including the
+signal used to tell sequential from parallel tool calls: parallel calls must
+produce spans whose time ranges overlap, sequential ones must not.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from pathlib import Path
+
+import pytest
+
+from tracing.exporter import SQLiteSpanExporter, list_traces, read_trace
+from tracing.instrumentation import (
+    build_tracer_provider,
+    chat_span,
+    execute_tool_span,
+    get_tracer,
+    invoke_agent_span,
+    mark_error,
+    retrieval_span,
+    set_chat_usage,
+    set_retrieval_results,
+    set_tool_call_io,
+)
+
+
+@pytest.fixture
+def db_path(tmp_path: Path) -> Path:
+    return tmp_path / "traces.db"
+
+
+def _make_tracer(db_path: Path):
+    exporter = SQLiteSpanExporter(db_path)
+    provider = build_tracer_provider(exporter)
+    return provider, get_tracer(provider)
+
+
+def _run_synthetic_pipeline(tracer, *, capture_content: bool) -> str:
+    with invoke_agent_span(tracer, agent_name="erp-chat", conversation_id="conv-1") as root:
+        trace_id = f"{root.get_span_context().trace_id:032x}"
+
+        with retrieval_span(
+            tracer, data_source_id="erp-docs", top_k=5, query_text="在庫は?", capture_content=capture_content
+        ) as rspan:
+            set_retrieval_results(rspan, [{"id": "doc_1", "score": 0.9}], capture_content=capture_content)
+
+        with execute_tool_span(tracer, tool_name="check_inventory", tool_call_id="call_1") as tspan:
+            set_tool_call_io(
+                tspan, arguments={"sku": "A1"}, result={"qty": 120}, capture_content=capture_content
+            )
+
+        with chat_span(tracer, request_model="qwen3-8b", provider_name="local") as cspan:
+            set_chat_usage(
+                cspan, input_tokens=1200, output_tokens=80, response_model="qwen3-8b-0912", finish_reasons=["stop"]
+            )
+    return trace_id
+
+
+def test_pipeline_persists_expected_span_tree(db_path):
+    provider, tracer = _make_tracer(db_path)
+    trace_id = _run_synthetic_pipeline(tracer, capture_content=False)
+    provider.shutdown()
+
+    spans = read_trace(db_path, trace_id)
+    assert len(spans) == 4  # invoke_agent + retrieval + execute_tool + chat
+    assert all(s["trace_id"] == trace_id for s in spans)
+    assert all(len(s["trace_id"]) == 32 for s in spans)
+    assert all(len(s["span_id"]) == 16 for s in spans)
+
+    by_name = {s["name"]: s for s in spans}
+    root = by_name["invoke_agent erp-chat"]
+    assert root["parent_span_id"] is None
+    assert root["kind"] == "INTERNAL"
+    assert root["attributes"]["gen_ai.operation.name"] == "invoke_agent"
+    assert root["attributes"]["gen_ai.agent.name"] == "erp-chat"
+    assert root["attributes"]["gen_ai.conversation.id"] == "conv-1"
+
+    retrieval = by_name["retrieval erp-docs"]
+    assert retrieval["kind"] == "CLIENT"
+    assert retrieval["parent_span_id"] == root["span_id"]
+    assert retrieval["attributes"]["gen_ai.operation.name"] == "retrieval"
+    assert retrieval["attributes"]["gen_ai.retrieval.top_k"] == 5
+
+    tool = by_name["execute_tool check_inventory"]
+    assert tool["kind"] == "INTERNAL"
+    assert tool["parent_span_id"] == root["span_id"]
+    assert tool["attributes"]["gen_ai.tool.name"] == "check_inventory"
+    assert tool["attributes"]["gen_ai.tool.call.id"] == "call_1"
+    assert tool["attributes"]["gen_ai.tool.type"] == "function"
+
+    chat = by_name["chat qwen3-8b"]
+    assert chat["kind"] == "CLIENT"
+    assert chat["parent_span_id"] == root["span_id"]
+    assert chat["attributes"]["gen_ai.request.model"] == "qwen3-8b"
+    assert chat["attributes"]["gen_ai.usage.input_tokens"] == 1200
+    assert chat["attributes"]["gen_ai.usage.output_tokens"] == 80
+    assert chat["attributes"]["gen_ai.response.finish_reasons"] == ["stop"]
+
+
+def test_capture_content_false_omits_sensitive_attributes(db_path):
+    provider, tracer = _make_tracer(db_path)
+    trace_id = _run_synthetic_pipeline(tracer, capture_content=False)
+    provider.shutdown()
+
+    spans = read_trace(db_path, trace_id)
+    retrieval = next(s for s in spans if s["name"] == "retrieval erp-docs")
+    tool = next(s for s in spans if s["name"] == "execute_tool check_inventory")
+
+    assert "gen_ai.retrieval.query.text" not in retrieval["attributes"]
+    assert "gen_ai.retrieval.documents" not in retrieval["attributes"]
+    assert "gen_ai.tool.call.arguments" not in tool["attributes"]
+    assert "gen_ai.tool.call.result" not in tool["attributes"]
+
+
+def test_capture_content_true_records_sensitive_attributes(db_path):
+    provider, tracer = _make_tracer(db_path)
+    trace_id = _run_synthetic_pipeline(tracer, capture_content=True)
+    provider.shutdown()
+
+    spans = read_trace(db_path, trace_id)
+    retrieval = next(s for s in spans if s["name"] == "retrieval erp-docs")
+    tool = next(s for s in spans if s["name"] == "execute_tool check_inventory")
+
+    assert retrieval["attributes"]["gen_ai.retrieval.query.text"] == "在庫は?"
+    documents = json.loads(retrieval["attributes"]["gen_ai.retrieval.documents"])
+    assert documents == [{"id": "doc_1", "score": 0.9}]
+
+    arguments = json.loads(tool["attributes"]["gen_ai.tool.call.arguments"])
+    result = json.loads(tool["attributes"]["gen_ai.tool.call.result"])
+    assert arguments == {"sku": "A1"}
+    assert result == {"qty": 120}
+
+
+def test_mark_error_sets_status_and_error_type(db_path):
+    provider, tracer = _make_tracer(db_path)
+    with invoke_agent_span(tracer, agent_name="erp-chat") as root:
+        trace_id = f"{root.get_span_context().trace_id:032x}"
+        with execute_tool_span(tracer, tool_name="check_inventory") as tspan:
+            mark_error(tspan, "timeout", "tool call timed out")
+    provider.shutdown()
+
+    spans = read_trace(db_path, trace_id)
+    tool = next(s for s in spans if s["name"] == "execute_tool check_inventory")
+    assert tool["status_code"] == "ERROR"
+    assert tool["status_description"] == "tool call timed out"
+    assert tool["attributes"]["error.type"] == "timeout"
+
+
+async def _call_tool(tracer, name: str, call_id: str, delay_s: float) -> None:
+    with execute_tool_span(tracer, tool_name=name, tool_call_id=call_id) as span:
+        await asyncio.sleep(delay_s)
+        set_tool_call_io(span, arguments={}, result={}, capture_content=False)
+
+
+def test_parallel_tool_calls_produce_overlapping_spans(db_path):
+    """This is the mechanism classifying pitfall #1 relies on: fan-out
+    tool calls must show overlapping time ranges under the same parent."""
+    provider, tracer = _make_tracer(db_path)
+
+    async def run() -> str:
+        with invoke_agent_span(tracer, agent_name="erp-chat") as root:
+            trace_id = f"{root.get_span_context().trace_id:032x}"
+            await asyncio.gather(
+                _call_tool(tracer, "check_inventory", "call_1", 0.05),
+                _call_tool(tracer, "get_price", "call_2", 0.05),
+            )
+        return trace_id
+
+    trace_id = asyncio.run(run())
+    provider.shutdown()
+
+    spans = read_trace(db_path, trace_id)
+    root = next(s for s in spans if s["name"] == "invoke_agent erp-chat")
+    tool_spans = [s for s in spans if s["name"].startswith("execute_tool ")]
+    assert len(tool_spans) == 2
+    assert all(s["parent_span_id"] == root["span_id"] for s in tool_spans)
+
+    a, b = tool_spans
+    overlaps = a["start_time_unix_nano"] < b["end_time_unix_nano"] and b["start_time_unix_nano"] < a["end_time_unix_nano"]
+    assert overlaps
+
+
+def test_sequential_tool_calls_do_not_overlap(db_path):
+    """Contrast case for the above: awaiting one call after another must not
+    overlap -- this is the 'before' shape of pitfall #1 (the direct-await bug)."""
+    provider, tracer = _make_tracer(db_path)
+
+    async def run() -> str:
+        with invoke_agent_span(tracer, agent_name="erp-chat") as root:
+            trace_id = f"{root.get_span_context().trace_id:032x}"
+            await _call_tool(tracer, "check_inventory", "call_1", 0.02)
+            await _call_tool(tracer, "get_price", "call_2", 0.02)
+        return trace_id
+
+    trace_id = asyncio.run(run())
+    provider.shutdown()
+
+    spans = read_trace(db_path, trace_id)
+    tool_spans = sorted(
+        (s for s in spans if s["name"].startswith("execute_tool ")),
+        key=lambda s: s["start_time_unix_nano"],
+    )
+    assert len(tool_spans) == 2
+    first, second = tool_spans
+    assert first["end_time_unix_nano"] <= second["start_time_unix_nano"]
+
+
+def test_list_traces_returns_one_row_per_trace(db_path):
+    provider, tracer = _make_tracer(db_path)
+    trace_id = _run_synthetic_pipeline(tracer, capture_content=False)
+    provider.shutdown()
+
+    traces = list_traces(db_path)
+    assert len(traces) == 1
+    assert traces[0]["trace_id"] == trace_id
+    assert traces[0]["name"] == "invoke_agent erp-chat"
+    assert traces[0]["duration_ms"] >= 0
