@@ -6,14 +6,21 @@ provider is set (tracing.instrumentation.set_global_tracer_provider). This
 wrapper only adds the agent-side execute_tool span around each call, so
 the SDK's span and the server's span nest under it.
 
+Over HTTP it also writes traceparent into each request's HTTP headers, so
+HTTP-level spans on the server side (ASGI middleware) join the same trace.
+The SDK only puts it in params._meta, which HTTP-level code never reads.
+
 One instance = one connection, reused for every call inside `async with`.
 """
 from __future__ import annotations
 from typing import Any
 
+import httpx2
 from mcp import Client, types
+from mcp.client.streamable_http import streamable_http_client
 from mcp.server import Server
-from opentelemetry import trace
+from mcp.shared._httpx_utils import create_mcp_http_client
+from opentelemetry import propagate, trace
 
 from tracing.instrumentation import (
     MCP_METHOD_NAME,
@@ -23,11 +30,22 @@ from tracing.instrumentation import (
 )
 
 
+async def _inject_traceparent(request: httpx2.Request) -> None:
+    propagate.inject(request.headers)
+
+
 class McpToolClient:
     def __init__(self, server: str | Server, tracer: trace.Tracer, *, agent_name: str | None = None) -> None:
         """`server` is a URL (e.g. http://127.0.0.1:8000/mcp), or a Server object
         to connect in-process without HTTP (for tests)."""
-        self._client = Client(server)
+        self._http: httpx2.AsyncClient | None = None
+        if isinstance(server, str):
+            # Same defaults (timeouts) the SDK would use, plus our request hook.
+            self._http = create_mcp_http_client()
+            self._http.event_hooks = {"request": [_inject_traceparent]}
+            self._client = Client(streamable_http_client(server, http_client=self._http))
+        else:
+            self._client = Client(server)
         self._tracer = tracer
         self._agent_name = agent_name
 
@@ -37,6 +55,8 @@ class McpToolClient:
 
     async def __aexit__(self, *exc_info: Any) -> None:
         await self._client.__aexit__(*exc_info)
+        if self._http is not None:  # passed in by us, so the SDK leaves closing it to us
+            await self._http.aclose()
 
     async def list_tools(self) -> list[types.Tool]:
         return (await self._client.list_tools()).tools

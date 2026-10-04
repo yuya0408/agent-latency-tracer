@@ -43,13 +43,13 @@
 
 | 場所 | 役割 | 状態 |
 |---|---|---|
-| [tracing/instrumentation.py](../tracing/instrumentation.py) | OTel GenAI規約・MCP規約のspan builder、グローバルProviderの登録 | ✅(TTFTを追加予定) |
+| [tracing/instrumentation.py](../tracing/instrumentation.py) | OTel GenAI規約・MCP規約のspan builder、グローバルProviderの登録。保存は`batch=True`で`BatchSpanProcessor`(テストは`SimpleSpanProcessor`) | ✅(TTFTを追加予定) |
 | [tracing/exporter.py](../tracing/exporter.py) | spanをSQLiteに保存(手元用) | ✅ |
 | [tracing/viewer/waterfall.py](../tracing/viewer/waterfall.py) | 単一HTMLのwaterfall(手元用) | ✅ |
 | [system/tools/](../system/tools/) | 業務ツールの定義＋モック実行(200〜800ms) | ✅(定義は仮。§6の2bで作り直す) |
 | [system/retrieval/](../system/retrieval/) | 手元用の検索(faiss)、合成ベクトルの生成 | ✅(合成ベクトルはpgvectorへの投入にも使う) |
-| [system/mcp_server/](../system/mcp_server/) | 自作MCPサーバ(低レベルAPI、Streamable HTTP、`127.0.0.1:8000/mcp`)。業務ツール＋文書検索`retrieve_documents`。`MCP_SERVER_OTEL=0`で計装オフ | ✅ |
-| [system/mcp_client.py](../system/mcp_client.py) | SDKの`Client`を包み、tool呼び出しを`execute_tool` spanで囲む。`async with`の間は接続を使い回す | ✅ |
+| [system/mcp_server/](../system/mcp_server/) | 自作MCPサーバ(低レベルAPI、Streamable HTTP、`127.0.0.1:8000/mcp`)。業務ツール＋文書検索`retrieve_documents`。計装オンのときはHTTPリクエストごとのspan(`opentelemetry-instrumentation-asgi`)も出す。`MCP_SERVER_OTEL=0`で計装オフ | ✅ |
+| [system/mcp_client.py](../system/mcp_client.py) | SDKの`Client`を包み、tool呼び出しを`execute_tool` spanで囲む。HTTPヘッダにも`traceparent`を載せる(`httpx2`の`event_hooks`。SigV4の署名もここに足す見込み)。`async with`の間は接続を使い回す | ✅ |
 | [scripts/try_mcp.py](../scripts/try_mcp.py) | 手元の動作確認。ツール3つを「1つずつ」と「同時に」で呼び、waterfallを`out/`に出す | ✅ |
 | `system/llm/` | OpenAI互換クライアント | ⬜ |
 | `system/agent.py` | エージェントループ | ⬜ |
@@ -67,6 +67,7 @@
 | `execute_tool <ツール名>` | 自作(`mcp_client.py`) | `gen_ai.tool.name`, `gen_ai.tool.call.id`, `mcp.method.name`, `mcp.protocol.version` |
 | `chat` | 自作 | `gen_ai.usage.input_tokens` / `output_tokens` |
 | `MCP send <メソッド>`(CLIENT) | SDK(手元側) | `mcp.method.name`, `jsonrpc.request.id`。この中で`params._meta`に`traceparent`を書き込む |
+| `POST /mcp`(SERVER) | `opentelemetry-instrumentation-asgi`(サーバ側) | HTTPリクエストを受け取ってから応答を返し終わるまで。親はHTTPヘッダの`traceparent` |
 | `<メソッド>`(SERVER、例: `tools/call search_master`) | SDK(サーバ側のmiddleware) | `mcp.method.name`, `mcp.protocol.version`, `gen_ai.tool.name`, `error.type` |
 
 - SDKのspanはグローバルのTracerProviderに送られる。登録しないと捨てられ、`traceparent`も送られない
@@ -112,7 +113,7 @@
 
 - [x] 1. AWS CLIとTerraformの確認(2026-10-03: WSLのUbuntuに導入済み。AWS CLI 2.36、Terraform 1.15、東京リージョンのIAMユーザーで認証できる)
 - [x] 2. 自作MCPサーバ(低レベルAPI)と計装つきMCPクライアントを、手元で動かす(2026-10-04。§7の「動かしていて見つかったこと」)
-- [ ] 2a. §7の2(正体の分からない待ち時間)を調べる。サーバ側にspanを足して切り分ける
+- [x] 2a. §7の2(正体の分からない待ち時間)を調べる(2026-10-04。原因は自作のSQLite保存。§7の2)
 - [ ] 2b. 業務ツールのカタログを作り直す。今の40個は`toolcall-serving-bench`のカタログ(選択を難しくするため、
   似た機能のツールをわざと並べたもの)の流用で、このプロジェクトとしての根拠が無い。方針は、Anthropicの
   [ツール設計の指針](https://www.anthropic.com/engineering/writing-tools-for-agents)(APIをそのまま包まず用途ごとにまとめる、
@@ -126,18 +127,30 @@
 
 ## 7. 動かしていて見つかったこと(手順書の「自然に発生」の候補)
 
+2と3はこのPCのディスクと自作のSQLite保存に固有の部分があるが、「同期的な保存・ログ送信がリクエストの処理を止める」
+形は実務でも起きる。
+
 1. **`tools/call`のたびに、サーバが内部で`tools/list`ハンドラを実行する。** 2026-07-28版のStreamable HTTPで、
    `Mcp-Param-*`ヘッダの検証にツールの引数の形が要るため(SDKの`Server.get_tool_input_schema`のdocstring)。
-   この処理は`traceparent`を読む前に走るので、**サーバ側に計装があっても親の無い別のトレースに記録され**、
-   エージェントのトレースからは「`MCP send`とサーバの`tools/call`の間の隙間」としてしか見えない。今のサーバでは
-   一覧がメモリ上にあり約1ms。一覧の組み立てが重いサーバでは呼び出しのたびに効く。`Server(..., get_tool_input_schema=...)`
-   を渡すと無くなる。SDKの初期設定のまま残している
-2. **正体の分からない待ち時間。** HTTP越しで、`MCP send tools/call`の時間からサーバの`tools/call`の時間を引いた差が
-   12〜100ms(80ms前後が多い)。手元とサーバの保存先を別のSQLiteファイルに分けても変わらなかった(同時書き込みの
-   待ちではない)。今のspanでは、どこで使っている時間か見分けられない(§6の2a)
-3. **自作のSQLite保存そのものが遅延を足す。** `SimpleSpanProcessor`がspanの終了時に同期的に書き込むため、
-   1 spanあたり約5〜6ms、イベントループを止める(#2と同じ形)。サーバでは1リクエストに2 span(1の`tools/list`と
-   `tools/call`)なので約10ms。上の2の一部はこれで説明できる
+   この処理はMCPの層が`traceparent`を読む前に走るので、MCPの層の計装だけでは**親の無い別のトレースに記録され**、
+   エージェントのトレースからは「`MCP send`とサーバの`tools/call`の間の隙間」としてしか見えなかった。HTTPの層の
+   span(`POST /mcp`)を足し、HTTPヘッダにも`traceparent`を載せると、その子としてトレースの中に見えるようになった。
+   今のサーバでは一覧がメモリ上にあり約1ms。一覧の組み立てが重いサーバでは呼び出しのたびに効く。
+   `Server(..., get_tool_input_schema=...)`を渡すと無くなる。SDKの初期設定のまま残している
+2. **計装の保存がツールの応答を遅らせていた(原因判明、2a)。** HTTP越しで、`MCP send tools/call`の時間からサーバの
+   `tools/call`の時間を引いた差が12〜100ms(80ms前後が多い)あった。切り分けの順:
+   - HTTPの層のspan → 待ち時間は通信ではなくサーバの中、それも「ツール処理が終わってから応答を送り始めるまで」
+   - asyncioのデバッグモード(`loop.slow_callback_duration`を20msに) → その区間でイベントループが30〜70ms
+     同期的に止まっている。サーバの計装をオフにすると消える
+   - 保存1回ごとの計測 → `tools/call` spanの保存だけがときどき約67ms。SQLite単体で、**前の書き込みから100ms以上
+     空くとcommitが65〜75msかかる**(連続なら4ms)ことを再現。ツール処理の数百msの後に保存されるspanが該当した
+   - `SimpleSpanProcessor`はspanの終了時に呼び出し元のスレッドで同期的に保存するので、その間イベントループが止まる
+     (#2と同じ形。`span.end()`も`export()`も同期の関数で、`await`を入れる余地が無い)
+   - `BatchSpanProcessor`(キューに入れ、別スレッドがまとめて保存)に切り替えると、差は3〜11msになった
+   - 確認: 保存先を手元とサーバで別ファイルに分けても変わらなかった(同時書き込みの待ちではない)。spanを作る
+     こと自体は1個あたり約0.03msで、問題は保存のほう
+3. **計装は無料ではない。** 保存の方式しだいで、測っている対象そのものを遅くする。`BatchSpanProcessor`は止めない代わりに、
+   保存まで最大`BATCH_EXPORT_INTERVAL_MS`(500ms)遅れ、終了時に`shutdown()`しないとキューに残ったspanが失われる
 
 ## 8. 実測済みの前提値
 

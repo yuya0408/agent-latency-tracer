@@ -10,6 +10,7 @@ dependencies = [
     "faiss-cpu>=1.9",
     # Pinned: v2 API, and the server-side OTel middleware is still provisional.
     "mcp==2.3.0",
+    "opentelemetry-instrumentation-asgi>=0.48b0",
 ]
 
 [project.optional-dependencies]

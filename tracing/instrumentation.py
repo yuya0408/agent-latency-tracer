@@ -24,7 +24,7 @@ from typing import Any, Iterator, Mapping, Sequence
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SpanExporter, SimpleSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SimpleSpanProcessor
 from opentelemetry.trace import Span, SpanKind, Status, StatusCode
 
 # --- gen_ai.* attribute keys (see module docstring for source) -------------
@@ -63,15 +63,32 @@ MCP_SESSION_ID = "mcp.session.id"
 _INSTRUMENTATION_SCOPE = "agent-latency-tracer"
 
 
-def build_tracer_provider(exporter: SpanExporter, *, service_name: str = "agent-latency-tracer") -> TracerProvider:
-    """Wire a single exporter with SimpleSpanProcessor (export-on-end, no batching).
+# How often the batch worker writes queued spans. Shorter than the SDK default
+# (5s) so a local run's spans are on disk soon after it finishes.
+BATCH_EXPORT_INTERVAL_MS = 500
 
-    This project favors deterministic export over throughput: a demo pipeline
-    run should be fully persisted the moment it finishes, with no batching
-    window that could drop or delay spans before the process exits.
+
+def build_tracer_provider(
+    exporter: SpanExporter, *, service_name: str = "agent-latency-tracer", batch: bool = False
+) -> TracerProvider:
+    """Wire a single exporter to a new provider.
+
+    batch=False (SimpleSpanProcessor): each span is exported synchronously the
+    moment it ends, on the calling thread. Deterministic, so tests use it --
+    but the write blocks the event loop, and a SQLite commit after an idle
+    gap took ~67ms on this PC, which delayed every tool response by that much
+    (docs/DESIGN.md §7).
+
+    batch=True (BatchSpanProcessor): ending a span only queues it; a worker
+    thread exports queued spans every BATCH_EXPORT_INTERVAL_MS. Use this
+    in anything whose latency is being observed. Spans still queued when the
+    process exits are lost unless provider.shutdown() (or force_flush()) runs.
     """
     provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    if batch:
+        provider.add_span_processor(BatchSpanProcessor(exporter, schedule_delay_millis=BATCH_EXPORT_INTERVAL_MS))
+    else:
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
     return provider
 
 

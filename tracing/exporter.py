@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -45,7 +46,11 @@ INSERT OR REPLACE INTO spans (
 
 class SQLiteSpanExporter(SpanExporter):
     def __init__(self, db_path: str | Path) -> None:
-        self._conn = sqlite3.connect(str(db_path))
+        # BatchSpanProcessor calls export() from its own worker thread, not the
+        # thread that created the connection, so allow cross-thread use and
+        # serialize access ourselves.
+        self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        self._lock = threading.Lock()
         self._conn.execute(_SCHEMA_SQL)
         self._conn.execute(_INDEX_SQL)
         self._conn.commit()
@@ -53,14 +58,16 @@ class SQLiteSpanExporter(SpanExporter):
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
         try:
             rows = [_span_to_row(span) for span in spans]
-            self._conn.executemany(_INSERT_SQL, rows)
-            self._conn.commit()
+            with self._lock:
+                self._conn.executemany(_INSERT_SQL, rows)
+                self._conn.commit()
             return SpanExportResult.SUCCESS
         except Exception:
             return SpanExportResult.FAILURE
 
     def shutdown(self) -> None:
-        self._conn.close()
+        with self._lock:
+            self._conn.close()
 
     def force_flush(self, timeout_millis: int = 30_000) -> bool:
         return True

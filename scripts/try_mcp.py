@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from system.mcp_client import McpToolClient
 from tracing.exporter import SQLiteSpanExporter
 from tracing.instrumentation import (
+    BATCH_EXPORT_INTERVAL_MS,
     build_tracer_provider,
     get_tracer,
     invoke_agent_span,
@@ -47,7 +48,7 @@ async def run(client: McpToolClient, tracer, *, concurrent: bool) -> str:
 
 async def main() -> None:
     db_path = os.environ.get("TRACE_DB", "traces.db")
-    provider = build_tracer_provider(SQLiteSpanExporter(db_path), service_name="agent")
+    provider = build_tracer_provider(SQLiteSpanExporter(db_path), service_name="agent", batch=True)
     set_global_tracer_provider(provider)
     tracer = get_tracer(provider)
 
@@ -59,11 +60,17 @@ async def main() -> None:
             "concurrent": await run(client, tracer, concurrent=True),
         }
 
+    provider.force_flush()  # our queued spans
+    # The server's spans are written by its own batch worker, at most one
+    # interval after they end.
+    await asyncio.sleep(2 * BATCH_EXPORT_INTERVAL_MS / 1000)
+
     OUT_DIR.mkdir(exist_ok=True)
     for label, trace_id in trace_ids.items():
         path = OUT_DIR / f"try_mcp_{label}.html"
         path.write_text(render_trace_html(db_path, trace_id), encoding="utf-8")
         print(f"{label}: {path}")
+    provider.shutdown()
 
 
 if __name__ == "__main__":
