@@ -54,6 +54,12 @@ TOOL_CALL_RESULT = "gen_ai.tool.call.result"  # opt-in, may be sensitive
 
 ERROR_TYPE = "error.type"
 
+# --- mcp.* attribute keys (OTel MCP semantic conventions) -------------------
+
+MCP_METHOD_NAME = "mcp.method.name"
+MCP_PROTOCOL_VERSION = "mcp.protocol.version"
+MCP_SESSION_ID = "mcp.session.id"
+
 _INSTRUMENTATION_SCOPE = "agent-latency-tracer"
 
 
@@ -67,6 +73,18 @@ def build_tracer_provider(exporter: SpanExporter, *, service_name: str = "agent-
     provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     return provider
+
+
+def set_global_tracer_provider(provider: TracerProvider) -> None:
+    """Also register `provider` as the process-wide default.
+
+    The MCP SDK creates its own spans (client "MCP send ..." and server-side
+    middleware) through the global provider, not one passed in. Without this
+    they are silently dropped, and no traceparent reaches the server either.
+    OTel allows this only once per process; later calls are ignored with a
+    warning.
+    """
+    trace.set_tracer_provider(provider)
 
 
 def get_tracer(provider: TracerProvider) -> trace.Tracer:

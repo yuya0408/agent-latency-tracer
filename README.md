@@ -54,16 +54,23 @@ MCPサーバはAmazon Bedrock AgentCore Runtime上で動かし、計装はOpenTe
 
 | 部品 | 実装 | 補足 |
 |---|---|---|
-| エージェント | Python・asyncio | 検索→LLM→tool呼び出し→LLM→回答のループ |
+| エージェント | Python・asyncio | LLMがツール(業務ツール・文書検索)を選んで呼び、結果を見て次を決めるループ |
 | LLM | llama.cpp(OpenAI互換API、手元のCPU) | 小さいモデルを使う。OpenAI互換なので、他の推論サーバにも接続先を変えるだけで差し替えられる |
-| ツール | 自作のMCPサーバ(公式Python SDKの低レベルAPI、Streamable HTTP) | 業務システム風のツール定義40個とモック実行(200〜800ms)、検索ツール。AgentCore Runtimeに預けて動かす |
+| ツール | 自作のMCPサーバ(公式Python SDKの低レベルAPI、Streamable HTTP) | 業務システム風のツールとモック実行(200〜800ms)、文書検索ツール。AgentCore Runtimeに預けて動かす(業務ツールの構成は作り直し予定。下記) |
 | 認証 | IAMの署名(SigV4) | 手元のAWSクレデンシャルで署名する |
-| RAG | RDS for PostgreSQL + pgvector | 検索はMCPサーバのツールの1つ。RDSはVPCの中だけに置き、インターネットに出さない |
+| RAG | RDS for PostgreSQL + pgvector | 検索はMCPサーバのツールの1つで、使うかどうかはLLMが決める。RDSはVPCの中だけに置き、インターネットに出さない |
 | 計装 | OpenTelemetry(GenAI規約・MCP規約) | トレースの文脈はMCPリクエストの`params._meta.traceparent`でサーバに渡す |
 | 保存・可視化 | CloudWatch(Transaction Search) | AgentCoreが出す基盤側のspan・メトリクスと、自分で張ったspanを同じ場所に集める |
 
 **手元だけでも動く。** MCPサーバとエージェントはAWSを使わずに手元で動かせる(検索はfaiss、トレースは
 自作のSQLite保存と単一HTMLのwaterfallビューア)。開発中の確認と、AWSを使わずにコードを試したい読み手のため。
+
+```powershell
+# ターミナル1: MCPサーバ(127.0.0.1:8000/mcp)
+.venv\Scripts\python.exe -m system.mcp_server
+# ターミナル2: ツールを3つ「1つずつ」と「同時に」呼び、waterfallをout/に出す
+.venv\Scripts\python.exe scripts\try_mcp.py
+```
 
 **MCPサーバ側の計装はオン/オフを切り替えられるようにする。** サーバが別の言語・別のチームで作られていて
 計装が無い、という状況はよくあるため。
@@ -80,17 +87,17 @@ MCPサーバはAmazon Bedrock AgentCore Runtime上で動かし、計装はOpenTe
 | 1 | 独立したtool呼び出しを逐次awaitする | `asyncio.gather`で並列化 |
 | 2 | async関数の中でブロッキング呼び出し(gatherしても実質直列) | 非同期I/O/スレッドへ逃がす |
 | 3 | エージェントループの過剰反復(同じtoolを何度も呼ぶ) | 反復回数の上限 |
-| M2 | リクエストごとにMCPセッションを張り直す(ツール一覧の取り直しを含む) | セッションの再利用 |
+| M2 | リクエストごとにMCPクライアントを作り直す(接続・版の問い合わせ・ツール一覧の取り直し。AgentCoreではセッションIDを使い回せず、新しいmicroVMのコールドスタートを待つ) | クライアントの再利用 |
 | R | MCPのタイムアウト→リトライが1つのspanの中に隠れる | リトライの各試行を記録する |
 | 5 | ベクトル検索のインデックスが無く全件走査になる(pgvector) | HNSWインデックスを作る |
 | 6 | 検索を1件ずつ呼ぶ | まとめて呼ぶ(問題になるかは実測で確かめる) |
-| M1 | tool定義(40個)によるプロンプトの膨張 | 必要なtoolだけ渡す/遅延ロード |
+| M1 | tool定義の多さによるプロンプトの膨張 | 必要なtoolだけ渡す/遅延ロード |
 | M4 | 大きなtool結果が次のターンのコンテキストに積まれる | 結果の要約・切り詰め |
 | 8/9 | 長い入力(prefill)と長い出力(decode) | 入力の絞り込み/出力長の制御 |
 | 10 | プレフィックスキャッシュが効かない(先頭に日時等の動的値) | 動的値を後ろへ移す |
 
-**候補(事例を選ぶときに採否を決める)**: リクエストのたびに認証や署名の準備をやり直す、
-AgentCoreの新しいセッションのコールドスタート。
+**候補(事例を選ぶときに採否を決める)**: リクエストのたびに認証や署名の準備をやり直す。
+動かしている途中で見つかったものは[設計書](docs/DESIGN.md)の§7。
 
 ### 検索についての実測メモ(faiss、手元)
 
@@ -108,15 +115,17 @@ pgvectorに移る前に、手元のfaissで測った値。pgvectorでの値は�
 ```
 agent-latency-tracer/
 ├── system/                 # 観測対象のエージェント
-│   ├── tools/               # ツール定義40個 + モック実行
+│   ├── tools/               # 業務ツールの定義 + モック実行
 │   ├── retrieval/            # 手元用の検索(faiss)
+│   ├── mcp_server/            # 自作MCPサーバ
+│   ├── mcp_client.py          # 計装つきMCPクライアント
 │   ├── agent.py               # エージェントループ(作成予定)
-│   ├── llm/                   # OpenAI互換クライアント(作成予定)
-│   └── mcp_server/            # 自作MCPサーバ(作成予定)
+│   └── llm/                   # OpenAI互換クライアント(作成予定)
 ├── tracing/                  # 計装と、手元用の保存・可視化
 │   ├── instrumentation.py    # OTel span定義
 │   ├── exporter.py            # SQLiteへのexporter(手元用)
 │   └── viewer/waterfall.py     # waterfallビューア(手元用)
+├── scripts/                  # 手元での動作確認
 ├── infra/                    # Terraform(作成予定)
 ├── traces/                   # 手順書の根拠にするトレース(作成予定)
 ├── tests/
@@ -126,5 +135,6 @@ agent-latency-tracer/
     └── runbook.md              # 切り分けの手順書(作成予定)
 ```
 
-ツール定義40個は、別リポジトリ`toolcall-serving-bench`の`schema/tools.json`(汎用的な業務システムの
-語彙で作ったツールカタログ)を取り込んだもの。
+今の業務ツールの定義(40個)は、別リポジトリ`toolcall-serving-bench`の`schema/tools.json`(汎用的な業務システムの
+語彙で作ったツールカタログ)を仮に取り込んだもの。あちらはツール選択の精度を測るために、似た機能のツールを
+わざと並べてあるので、このプロジェクト用に作り直す(方針は[設計書](docs/DESIGN.md)§6の2b)。

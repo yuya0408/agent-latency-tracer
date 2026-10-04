@@ -8,6 +8,8 @@ dependencies = [
     "opentelemetry-sdk>=1.27",
     "numpy>=1.25",
     "faiss-cpu>=1.9",
+    # Pinned: v2 API, and the server-side OTel middleware is still provisional.
+    "mcp==2.3.0",
 ]
 
 [project.optional-dependencies]

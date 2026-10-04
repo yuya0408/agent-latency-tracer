@@ -1,6 +1,6 @@
 # 設計書: agent-latency-tracer
 
-最終更新: 2026-10-03
+最終更新: 2026-10-04
 
 「今どこまでできていて、次に何をやるか」を把握するための設計書。目的・構成・事例集は
 [README.md](../README.md)、事例の出典は [latency-pitfalls-survey.md](latency-pitfalls-survey.md)。
@@ -11,7 +11,8 @@
 |---|---|---|
 | MCPサーバの置き場所 | AgentCore Runtime | AWSのAIエージェント向けサービスの経験を得るため。比較の対象ではなく、土台として使う |
 | 認証 | IAMの署名(SigV4) | 手元のクレデンシャルで済み、Cognito(ユーザー管理)が要らない |
-| RAG | RDS for PostgreSQL + pgvector、VPCの中だけ | 検索はMCPサーバのツールの1つ。AgentCoreのVPCモードでRDSにつなぎ、RDSはインターネットに出さない |
+| RAG | RDS for PostgreSQL + pgvector、VPCの中だけ | 検索はMCPサーバのツールの1つで、使うかどうかはLLMが決める。AgentCoreのVPCモードでRDSにつなぎ、RDSはインターネットに出さない |
+| MCPのSDKとプロトコルの版 | 公式Python SDK `mcp==2.3.0`(低レベルAPI)。プロトコルはSDKの初期設定のまま(2026-07-28版。相手が古い版なら自動で切り替わる) | 新しく作るなら何も指定しない状態が自然。古い版に固定する理由(「今は古い版が多い」)は推測にすぎなかった |
 | LLM | 手元のllama.cpp(小さいモデル) | GPU費用を避ける。小さいモデルの思わぬ動きも観測の対象にする。偽LLMは自動テストの中だけで使う |
 | トレースの集め先 | CloudWatch(Transaction Search) | AgentCoreの基盤側のspanと同じ場所に集める。実務で標準的なやり方 |
 | 手元での開発 | AWS無しでも動く形を残す(検索はfaiss、トレースは自作SQLite＋waterfall) | 開発中の確認と、AWSを使わない読み手のため |
@@ -26,8 +27,8 @@
  ┌──────────────────────────┐                  ┌──────────────────────────────────────┐
  │ agent.py(エージェントループ) │──MCP+SigV4──────▶│ AgentCore Runtime                     │
  │   ├ llm/ → llama.cpp       │                  │   └ mcp_server/(コンテナ)              │
- │   └ MCPクライアント          │                  │        ├ 業務ツール40個(モック)          │
- │ 事例ごとに1か所だけ          │                  │        └ 検索ツール ─VPC─▶ RDS(pgvector) │
+ │   └ MCPクライアント          │                  │        ├ 業務ツール(モック)              │
+ │ 事例ごとに1か所だけ          │                  │        └ 文書検索 ─VPC─▶ RDS(pgvector)  │
  │ 落とし穴ありに切り替える      │                  │                                      │
  └─────────────┬────────────┘                  │ CloudWatch                           │
                │ OTLP(SigV4)                    │   ├ AgentCoreの基盤span・メトリクス(自動)│
@@ -42,12 +43,14 @@
 
 | 場所 | 役割 | 状態 |
 |---|---|---|
-| [tracing/instrumentation.py](../tracing/instrumentation.py) | OTel GenAI規約のspan builder | ✅(MCP規約の属性・TTFTを追加予定) |
+| [tracing/instrumentation.py](../tracing/instrumentation.py) | OTel GenAI規約・MCP規約のspan builder、グローバルProviderの登録 | ✅(TTFTを追加予定) |
 | [tracing/exporter.py](../tracing/exporter.py) | spanをSQLiteに保存(手元用) | ✅ |
 | [tracing/viewer/waterfall.py](../tracing/viewer/waterfall.py) | 単一HTMLのwaterfall(手元用) | ✅ |
-| [system/tools/](../system/tools/) | ツール定義40個＋モック実行(200〜800ms) | ✅(MCPサーバの中身として使う) |
+| [system/tools/](../system/tools/) | 業務ツールの定義＋モック実行(200〜800ms) | ✅(定義は仮。§6の2bで作り直す) |
 | [system/retrieval/](../system/retrieval/) | 手元用の検索(faiss)、合成ベクトルの生成 | ✅(合成ベクトルはpgvectorへの投入にも使う) |
-| `system/mcp_server/` | 自作MCPサーバ(低レベルAPI、Streamable HTTP、`:8000/mcp`) | ⬜ |
+| [system/mcp_server/](../system/mcp_server/) | 自作MCPサーバ(低レベルAPI、Streamable HTTP、`127.0.0.1:8000/mcp`)。業務ツール＋文書検索`retrieve_documents`。`MCP_SERVER_OTEL=0`で計装オフ | ✅ |
+| [system/mcp_client.py](../system/mcp_client.py) | SDKの`Client`を包み、tool呼び出しを`execute_tool` spanで囲む。`async with`の間は接続を使い回す | ✅ |
+| [scripts/try_mcp.py](../scripts/try_mcp.py) | 手元の動作確認。ツール3つを「1つずつ」と「同時に」で呼び、waterfallを`out/`に出す | ✅ |
 | `system/llm/` | OpenAI互換クライアント | ⬜ |
 | `system/agent.py` | エージェントループ | ⬜ |
 | `infra/` | Terraform(VPC・RDS・AgentCore・CloudWatchの設定) | ⬜ |
@@ -57,21 +60,26 @@
 
 ### 今あるもの
 
-| span (`gen_ai.operation.name`) | 主な属性 |
-|---|---|
-| `invoke_agent` (root) | `gen_ai.agent.name` |
-| `retrieval` | `gen_ai.retrieval.top_k` |
-| `execute_tool` | `gen_ai.tool.name`, `gen_ai.tool.call.id` |
-| `chat` | `gen_ai.usage.input_tokens` / `output_tokens` |
+| span | 作るもの | 主な属性 |
+|---|---|---|
+| `invoke_agent` (root) | 自作 | `gen_ai.agent.name` |
+| `retrieval` | 自作 | `gen_ai.retrieval.top_k` |
+| `execute_tool <ツール名>` | 自作(`mcp_client.py`) | `gen_ai.tool.name`, `gen_ai.tool.call.id`, `mcp.method.name`, `mcp.protocol.version` |
+| `chat` | 自作 | `gen_ai.usage.input_tokens` / `output_tokens` |
+| `MCP send <メソッド>`(CLIENT) | SDK(手元側) | `mcp.method.name`, `jsonrpc.request.id`。この中で`params._meta`に`traceparent`を書き込む |
+| `<メソッド>`(SERVER、例: `tools/call search_master`) | SDK(サーバ側のmiddleware) | `mcp.method.name`, `mcp.protocol.version`, `gen_ai.tool.name`, `error.type` |
+
+- SDKのspanはグローバルのTracerProviderに送られる。登録しないと捨てられ、`traceparent`も送られない
+  (`set_global_tracer_provider`)
+- HTTP越しでは`execute_tool` → `MCP send tools/call` → サーバの`tools/call`の3段が1本のトレースになる。
+  HTTPを使わない接続(テストで使う)では`MCP send`が作られず、サーバのspanが`execute_tool`の直下につく
+- 2026-07-28版のMCPにはあいさつ(`initialize`)もセッションIDも無い。最初の`server/discover`は版の問い合わせだけ
 
 ### 足すもの
 
-- **MCPクライアント側**(OTel MCP規約): `initialize`・`tools/list`のspan。tool呼び出しは既存の`execute_tool`
-  spanに`mcp.method.name`・`mcp.session.id`等を足す。`params._meta`に`traceparent`を載せる
-- **MCPサーバ側**: 受けたメッセージごとのspan(SDKに組み込みの仕組み。オン/オフ切り替え)。検索ツールの中の
-  DBクエリのspan
+- **MCPサーバ側**: 検索ツールの中のDBクエリのspan
 - **AgentCoreの基盤側**(AWSが出す): `InvokeAgentRuntime` span(`latency_ms`、`session.id`)、
-  メトリクス(`Latency`、`SessionCount`等)
+  メトリクス(`Latency`、`SessionCount`等)。AgentCoreが付ける`Mcp-Session-Id`は`mcp.session.id`に記録する
 - **LLM**: TTFT(最初のトークンの時刻)
 
 ### 見分けにくいと予想している組み合わせ(再現して確かめる)
@@ -80,7 +88,7 @@
 |---|---|---|
 | #1 逐次await / #2 ブロッキング呼び出し | どちらもtool spanが階段状 | 並列化を意図したかの記録、イベントループの遅延 |
 | R リトライ | 1つのtool spanの中に隠れる | 試行ごとのspan event |
-| M2 セッション張り直し | tool呼び出しが一律に遅い | `initialize`/`tools/list`のspan、`mcp.session.id` |
+| M2 クライアントの作り直し | tool呼び出しが一律に遅い | `server/discover`/`tools/list`のspan、AgentCoreの`Mcp-Session-Id`と新しいmicroVMかどうか |
 | #8 長い入力 / #9 長い出力 | どちらもchat spanが長い | TTFT |
 | ネットワーク / AWSの基盤 / サーバのコード | エージェント側のspanだけでは区別できない | AgentCoreの`InvokeAgentRuntime` span、サーバ側span、新しいセッションかどうか |
 
@@ -91,18 +99,47 @@
 - AgentCore Runtimeの課金(待機中にも費用がかかるか)
 - 手元からCloudWatchにOTLPで送るときの受付口の仕様と署名の方法
 - RDSで使えるpgvectorのバージョン
-- この PC の CPU で llama.cpp の小さいモデルがどれくらいの速さで動くか(ツール定義40個入りのプロンプトで)
+- この PC の CPU で llama.cpp の小さいモデルがどれくらいの速さで動くか(ツール定義入りのプロンプトで)
+- **AgentCoreのセッションID**: AgentCoreはMCPの版に関係なく`Mcp-Session-Id`を付け、それで同じmicroVMに振り分ける。
+  付け直さないとリクエストごとに新しいmicroVMに行き、コールドスタートで遅くなりうる(公式の
+  MCP protocol contract)。2026-07-28版で話すとき、SDKのクライアントがこのIDを送り返すかは未確認
+- **AgentCoreに載せるときのサーバ設定**: AgentCoreは`stateless_http=True`を推奨。今はSDKの初期設定(False)なので、
+  載せるときに切り替える。ホストは`0.0.0.0`、ARM64のコンテナ
+- **ツールの結果に中身を持たせるか**: 今のモックは`{"status": "ok"}`しか返さない。§6の3でLLMを入れて、空の結果のせいで
+  LLMの動きが不自然になるなら、ツール名と引数から合成データを返す関数を足す
 
 ## 6. 次にやること
 
 - [x] 1. AWS CLIとTerraformの確認(2026-10-03: WSLのUbuntuに導入済み。AWS CLI 2.36、Terraform 1.15、東京リージョンのIAMユーザーで認証できる)
-- [ ] 2. 自作MCPサーバ(低レベルAPI)と計装つきMCPクライアントを、手元で動かす(検索はfaiss、トレースはSQLite)
+- [x] 2. 自作MCPサーバ(低レベルAPI)と計装つきMCPクライアントを、手元で動かす(2026-10-04。§7の「動かしていて見つかったこと」)
+- [ ] 2a. §7の2(正体の分からない待ち時間)を調べる。サーバ側にspanを足して切り分ける
+- [ ] 2b. 業務ツールのカタログを作り直す。今の40個は`toolcall-serving-bench`のカタログ(選択を難しくするため、
+  似た機能のツールをわざと並べたもの)の流用で、このプロジェクトとしての根拠が無い。方針は、Anthropicの
+  [ツール設計の指針](https://www.anthropic.com/engineering/writing-tools-for-agents)(APIをそのまま包まず用途ごとにまとめる、
+  機能の重なりを避ける)に沿った形を基本にし、公開されている業務システムのMCPサーバ(freee・Salesforce・
+  Dynamics 365など。少数の汎用ツール型が多い)も調べてから決める。「APIをそのまま包んだ汎用ツール(往復が増える)」
+  「似たツールを大量に並べる(M1、選び間違い)」は事例の落とし穴として再現する候補
 - [ ] 3. llama.cppの速度を測り、エージェントループを手元で組む
 - [ ] 4. Terraform: VPC・RDS(pgvector)・AgentCore・CloudWatch。データ投入と、pgvectorの検索の計測
 - [ ] 5. MCPサーバをAgentCoreに預け、トレースをCloudWatchに集める
 - [ ] 6. 事例を1つずつ再現し、手順書に書き、トレースを書き出す
 
-## 7. 実測済みの前提値
+## 7. 動かしていて見つかったこと(手順書の「自然に発生」の候補)
+
+1. **`tools/call`のたびに、サーバが内部で`tools/list`ハンドラを実行する。** 2026-07-28版のStreamable HTTPで、
+   `Mcp-Param-*`ヘッダの検証にツールの引数の形が要るため(SDKの`Server.get_tool_input_schema`のdocstring)。
+   この処理は`traceparent`を読む前に走るので、**サーバ側に計装があっても親の無い別のトレースに記録され**、
+   エージェントのトレースからは「`MCP send`とサーバの`tools/call`の間の隙間」としてしか見えない。今のサーバでは
+   一覧がメモリ上にあり約1ms。一覧の組み立てが重いサーバでは呼び出しのたびに効く。`Server(..., get_tool_input_schema=...)`
+   を渡すと無くなる。SDKの初期設定のまま残している
+2. **正体の分からない待ち時間。** HTTP越しで、`MCP send tools/call`の時間からサーバの`tools/call`の時間を引いた差が
+   12〜100ms(80ms前後が多い)。手元とサーバの保存先を別のSQLiteファイルに分けても変わらなかった(同時書き込みの
+   待ちではない)。今のspanでは、どこで使っている時間か見分けられない(§6の2a)
+3. **自作のSQLite保存そのものが遅延を足す。** `SimpleSpanProcessor`がspanの終了時に同期的に書き込むため、
+   1 spanあたり約5〜6ms、イベントループを止める(#2と同じ形)。サーバでは1リクエストに2 span(1の`tools/list`と
+   `tools/call`)なので約10ms。上の2の一部はこれで説明できる
+
+## 8. 実測済みの前提値
 
 - PCメモリ総量 13.74GB。大きな配列を作る前に空きを確認する
 - 手元のfaissでの検索の実測値はREADMEの「検索についての実測メモ」
