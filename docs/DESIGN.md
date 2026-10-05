@@ -46,7 +46,7 @@
 | [tracing/instrumentation.py](../tracing/instrumentation.py) | OTel GenAI規約・MCP規約のspan builder、グローバルProviderの登録。保存は`batch=True`で`BatchSpanProcessor`(テストは`SimpleSpanProcessor`) | ✅(TTFTを追加予定) |
 | [tracing/exporter.py](../tracing/exporter.py) | spanをSQLiteに保存(手元用) | ✅ |
 | [tracing/viewer/waterfall.py](../tracing/viewer/waterfall.py) | 単一HTMLのwaterfall(手元用) | ✅ |
-| [system/tools/](../system/tools/) | 業務ツールの定義＋モック実行(200〜800ms) | ✅(定義は仮。§6の2bで作り直す) |
+| [system/tools/](../system/tools/) | 業務ツール4つの定義(`catalog.json`)、データの種類と項目(`data_schema.json`)、モック実行(200〜800ms。中身を返すのは`describe_data`だけ) | ✅ |
 | [system/retrieval/](../system/retrieval/) | 手元用の検索(faiss)、合成ベクトルの生成 | ✅(合成ベクトルはpgvectorへの投入にも使う) |
 | [system/mcp_server/](../system/mcp_server/) | 自作MCPサーバ(低レベルAPI、Streamable HTTP、`127.0.0.1:8000/mcp`)。業務ツール＋文書検索`retrieve_documents`。計装オンのときはHTTPリクエストごとのspan(`opentelemetry-instrumentation-asgi`)も出す。`MCP_SERVER_OTEL=0`で計装オフ | ✅ |
 | [system/mcp_client.py](../system/mcp_client.py) | SDKの`Client`を包み、tool呼び出しを`execute_tool` spanで囲む。HTTPヘッダにも`traceparent`を載せる(`httpx2`の`event_hooks`。SigV4の署名もここに足す見込み)。`async with`の間は接続を使い回す | ✅ |
@@ -68,7 +68,7 @@
 | `chat` | 自作 | `gen_ai.usage.input_tokens` / `output_tokens` |
 | `MCP send <メソッド>`(CLIENT) | SDK(手元側) | `mcp.method.name`, `jsonrpc.request.id`。この中で`params._meta`に`traceparent`を書き込む |
 | `POST /mcp`(SERVER) | `opentelemetry-instrumentation-asgi`(サーバ側) | HTTPリクエストを受け取ってから応答を返し終わるまで。親はHTTPヘッダの`traceparent` |
-| `<メソッド>`(SERVER、例: `tools/call search_master`) | SDK(サーバ側のmiddleware) | `mcp.method.name`, `mcp.protocol.version`, `gen_ai.tool.name`, `error.type` |
+| `<メソッド>`(SERVER、例: `tools/call find_records`) | SDK(サーバ側のmiddleware) | `mcp.method.name`, `mcp.protocol.version`, `gen_ai.tool.name`, `error.type` |
 
 - SDKのspanはグローバルのTracerProviderに送られる。登録しないと捨てられ、`traceparent`も送られない
   (`set_global_tracer_provider`)
@@ -106,7 +106,7 @@
   MCP protocol contract)。2026-07-28版で話すとき、SDKのクライアントがこのIDを送り返すかは未確認
 - **AgentCoreに載せるときのサーバ設定**: AgentCoreは`stateless_http=True`を推奨。今はSDKの初期設定(False)なので、
   載せるときに切り替える。ホストは`0.0.0.0`、ARM64のコンテナ
-- **ツールの結果に中身を持たせるか**: 今のモックは`{"status": "ok"}`しか返さない。§6の3でLLMを入れて、空の結果のせいで
+- **ツールの結果に中身を持たせるか**: 今のモックは、`describe_data`(データの種類と項目)以外は呼ばれた内容と`"status": "ok"`しか返さない。§6の3でLLMを入れて、空の結果のせいで
   LLMの動きが不自然になるなら、ツール名と引数から合成データを返す関数を足す
 
 ## 6. 次にやること
@@ -114,7 +114,7 @@
 - [x] 1. AWS CLIとTerraformの確認(2026-10-03: WSLのUbuntuに導入済み。AWS CLI 2.36、Terraform 1.15、東京リージョンのIAMユーザーで認証できる)
 - [x] 2. 自作MCPサーバ(低レベルAPI)と計装つきMCPクライアントを、手元で動かす(2026-10-04。§7の「動かしていて見つかったこと」)
 - [x] 2a. §7の2(正体の分からない待ち時間)を調べる(2026-10-04。原因は自作のSQLite保存。§7の2)
-- [ ] 2b. 業務ツールのカタログを作り直す。今の40個は`toolcall-serving-bench`のカタログ(選択を難しくするため、
+- [x] 2b. 業務ツールのカタログを作り直す(2026-10-06)。それまでの40個は`toolcall-serving-bench`のカタログ(選択を難しくするため、
   似た機能のツールをわざと並べたもの)の流用で、このプロジェクトとしての根拠が無い。方針は、Anthropicの
   [ツール設計の指針](https://www.anthropic.com/engineering/writing-tools-for-agents)(APIをそのまま包まず用途ごとにまとめる、
   機能の重なりを避ける)に沿った形を基本にし、公開されている業務システムのMCPサーバ(freee・Salesforce・
@@ -127,7 +127,13 @@
     - **業務の区分ではツールを分けない。** 区分(販売・購買・在庫・会計・人事、＋共通マスタ)は、データの種類に付ける
       ラベルにする。M1の修正(ツールを絞る)で使える。旧カタログの「レポート」区分は文書検索と役割が重なるので外す
     - 落とし穴版(データの種類ごとの自動生成)と、ツールの絞り方は、事例を作る段階(§6の6)で決める
-    - 未決: データの種類、集計の扱い、書き込みの操作を入れるか
+    - **データの種類は15個。** 受注から入金まで(受注・出荷・請求)と発注から支払まで(発注・入荷・仕入請求)の2つの流れに、
+      在庫(残高・入出庫)・会計(仕訳・勘定科目)・人事(従業員・勤怠)の中心と、共通マスタ(取引先・品目・部門)を足した。
+      受注などには取引先IDと並べて取引先名も持たせ、名前で直接絞れるようにした(取引先マスタを先に引く往復は入れない)
+    - **集計は`aggregate_records`を1つ足す。** 全件を引いてLLMに計算させると結果が大きく(M4)、小さいLLMは計算も誤りやすい
+    - **書き込みの操作は入れない。** 事例集の遅延は読み取りで再現できる
+    - **`find_records`の`limit`は既定100・上限2000。** 既定はodata_mcp_go、上限はSalesforceの値。外した版はM4の落とし穴の候補
+    - 条件(`filter`)は`{field, op, value}`の並び(ANDだけ)。実例に多いクエリ文字列より、引数の形として検証しやすい
 - [ ] 3. llama.cppの速度を測り、エージェントループを手元で組む
 - [ ] 4. Terraform: VPC・RDS(pgvector)・AgentCore・CloudWatch。データ投入と、pgvectorの検索の計測
 - [ ] 5. MCPサーバをAgentCoreに預け、トレースをCloudWatchに集める
@@ -165,5 +171,7 @@
 - PCメモリ総量 13.74GB。大きな配列を作る前に空きを確認する
 - 手元のfaissでの検索の実測値はREADMEの「検索についての実測メモ」
 - venv: `.venv/Scripts/python.exe`(システムPythonにはfaissが無い)
+- 2026-10-06時点で、このPCではWindowsのスマートアプリコントロールがfaissのDLLの読み込みを止める。faissを読み込む
+  テスト(`test_retrieval.py`・`test_mcp.py`)とMCPサーバは、Windows側では動かない(対処は未定)
 - AWS: 既存アカウント(東京リージョン)、月60ドルの予算アラートあり。**AWS CLIとTerraformはWSLのUbuntuから使う**
   (Windows側には入っていない。クレデンシャルもUbuntu側の`~/.aws`)

@@ -29,9 +29,9 @@ OUT_DIR = Path("out")
 
 # Three independent lookups: none needs another's result, so they can run concurrently.
 CALLS = [
-    ("search_sales_record", {"query": "先月の売上"}),
-    ("search_inventory_record", {"query": "在庫が少ない品目"}),
-    ("get_fiscal_calendar", {}),
+    ("find_records", {"type": "sales_order", "filter": [{"field": "status", "op": "eq", "value": "未出荷"}]}),
+    ("find_records", {"type": "stock_balance", "filter": [{"field": "quantity", "op": "lt", "value": 10}]}),
+    ("retrieve_documents", {"query": "返品の手順"}),
 ]
 
 

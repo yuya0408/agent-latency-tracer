@@ -1,0 +1,195 @@
+{
+  "$comment": "describe_data が返すデータの種類と項目。業務ツールのモックは中身を返さないが、LLMが条件や集計の項目名を組み立てられるよう、ここだけは中身を持たせる。種類の選び方は docs/DESIGN.md §6の2b。",
+  "types": {
+    "partner": {
+      "area": "共通",
+      "label": "取引先",
+      "description": "販売先・仕入先",
+      "fields": [
+        {"name": "partner_id", "type": "string", "description": "取引先ID"},
+        {"name": "name", "type": "string", "description": "取引先名"},
+        {"name": "kind", "type": "string", "enum": ["販売先", "仕入先", "両方"], "description": "取引の種類"},
+        {"name": "payment_terms_days", "type": "integer", "description": "支払サイト(日)"}
+      ]
+    },
+    "item": {
+      "area": "共通",
+      "label": "品目",
+      "description": "販売・購買・在庫で扱う品目",
+      "fields": [
+        {"name": "item_code", "type": "string", "description": "品目コード"},
+        {"name": "name", "type": "string", "description": "品目名"},
+        {"name": "category", "type": "string", "description": "品目分類"},
+        {"name": "unit", "type": "string", "description": "単位"},
+        {"name": "standard_price", "type": "number", "description": "標準単価(円)"}
+      ]
+    },
+    "department": {
+      "area": "共通",
+      "label": "部門",
+      "description": "組織の部門",
+      "fields": [
+        {"name": "department_code", "type": "string", "description": "部門コード"},
+        {"name": "name", "type": "string", "description": "部門名"},
+        {"name": "parent_department_code", "type": "string", "description": "上位部門の部門コード"}
+      ]
+    },
+    "sales_order": {
+      "area": "販売",
+      "label": "受注",
+      "description": "取引先から受けた注文。明細(品目・数量・単価)は get_record で返す",
+      "fields": [
+        {"name": "order_id", "type": "string", "description": "受注ID"},
+        {"name": "partner_id", "type": "string", "description": "取引先ID"},
+        {"name": "partner_name", "type": "string", "description": "取引先名"},
+        {"name": "order_date", "type": "date", "description": "受注日"},
+        {"name": "delivery_date", "type": "date", "description": "納期"},
+        {"name": "amount", "type": "number", "description": "受注金額(円、税抜)"},
+        {"name": "status", "type": "string", "enum": ["未出荷", "一部出荷", "出荷済", "取消"], "description": "出荷の状況"}
+      ]
+    },
+    "shipment": {
+      "area": "販売",
+      "label": "出荷",
+      "description": "受注に対する出荷",
+      "fields": [
+        {"name": "shipment_id", "type": "string", "description": "出荷ID"},
+        {"name": "order_id", "type": "string", "description": "元の受注ID"},
+        {"name": "ship_date", "type": "date", "description": "出荷日"},
+        {"name": "warehouse", "type": "string", "description": "出荷元の倉庫"},
+        {"name": "status", "type": "string", "enum": ["出荷準備中", "出荷済"], "description": "出荷の状態"}
+      ]
+    },
+    "sales_invoice": {
+      "area": "販売",
+      "label": "請求",
+      "description": "取引先への請求",
+      "fields": [
+        {"name": "invoice_id", "type": "string", "description": "請求ID"},
+        {"name": "partner_id", "type": "string", "description": "取引先ID"},
+        {"name": "partner_name", "type": "string", "description": "取引先名"},
+        {"name": "invoice_date", "type": "date", "description": "請求日"},
+        {"name": "due_date", "type": "date", "description": "入金期日"},
+        {"name": "amount", "type": "number", "description": "請求金額(円、税込)"},
+        {"name": "status", "type": "string", "enum": ["未入金", "一部入金", "入金済"], "description": "入金の状況"}
+      ]
+    },
+    "purchase_order": {
+      "area": "購買",
+      "label": "発注",
+      "description": "仕入先への注文。明細(品目・数量・単価)は get_record で返す",
+      "fields": [
+        {"name": "po_id", "type": "string", "description": "発注ID"},
+        {"name": "partner_id", "type": "string", "description": "取引先ID"},
+        {"name": "partner_name", "type": "string", "description": "取引先名"},
+        {"name": "order_date", "type": "date", "description": "発注日"},
+        {"name": "expected_date", "type": "date", "description": "入荷予定日"},
+        {"name": "amount", "type": "number", "description": "発注金額(円、税抜)"},
+        {"name": "status", "type": "string", "enum": ["未入荷", "一部入荷", "入荷済", "取消"], "description": "入荷の状況"}
+      ]
+    },
+    "goods_receipt": {
+      "area": "購買",
+      "label": "入荷",
+      "description": "発注に対する入荷",
+      "fields": [
+        {"name": "receipt_id", "type": "string", "description": "入荷ID"},
+        {"name": "po_id", "type": "string", "description": "元の発注ID"},
+        {"name": "receipt_date", "type": "date", "description": "入荷日"},
+        {"name": "warehouse", "type": "string", "description": "入荷先の倉庫"},
+        {"name": "status", "type": "string", "enum": ["検品中", "検収済"], "description": "検品の状態"}
+      ]
+    },
+    "purchase_invoice": {
+      "area": "購買",
+      "label": "仕入請求",
+      "description": "仕入先からの請求",
+      "fields": [
+        {"name": "invoice_id", "type": "string", "description": "仕入請求ID"},
+        {"name": "partner_id", "type": "string", "description": "取引先ID"},
+        {"name": "partner_name", "type": "string", "description": "取引先名"},
+        {"name": "invoice_date", "type": "date", "description": "請求日"},
+        {"name": "due_date", "type": "date", "description": "支払期日"},
+        {"name": "amount", "type": "number", "description": "請求金額(円、税込)"},
+        {"name": "status", "type": "string", "enum": ["未払", "支払済"], "description": "支払の状況"}
+      ]
+    },
+    "stock_balance": {
+      "area": "在庫",
+      "label": "在庫残高",
+      "description": "品目・倉庫ごとの現在の在庫",
+      "fields": [
+        {"name": "item_code", "type": "string", "description": "品目コード"},
+        {"name": "item_name", "type": "string", "description": "品目名"},
+        {"name": "warehouse", "type": "string", "description": "倉庫"},
+        {"name": "quantity", "type": "number", "description": "在庫数"},
+        {"name": "allocated_quantity", "type": "number", "description": "受注に引き当て済みの数"}
+      ]
+    },
+    "stock_movement": {
+      "area": "在庫",
+      "label": "入出庫",
+      "description": "在庫の増減の履歴",
+      "fields": [
+        {"name": "movement_id", "type": "string", "description": "入出庫ID"},
+        {"name": "item_code", "type": "string", "description": "品目コード"},
+        {"name": "warehouse", "type": "string", "description": "倉庫"},
+        {"name": "movement_date", "type": "date", "description": "入出庫日"},
+        {"name": "kind", "type": "string", "enum": ["入庫", "出庫", "倉庫間移動", "棚卸調整"], "description": "増減の種類"},
+        {"name": "quantity", "type": "number", "description": "数量(出庫は負の数)"},
+        {"name": "source_id", "type": "string", "description": "元になった出荷ID・入荷ID"}
+      ]
+    },
+    "journal_entry": {
+      "area": "会計",
+      "label": "仕訳",
+      "description": "会計の仕訳。1行が1つの勘定科目の借方または貸方",
+      "fields": [
+        {"name": "entry_id", "type": "string", "description": "仕訳ID"},
+        {"name": "entry_date", "type": "date", "description": "計上日"},
+        {"name": "account_code", "type": "string", "description": "勘定科目コード"},
+        {"name": "account_name", "type": "string", "description": "勘定科目名"},
+        {"name": "department_code", "type": "string", "description": "部門コード"},
+        {"name": "debit_amount", "type": "number", "description": "借方金額(円)"},
+        {"name": "credit_amount", "type": "number", "description": "貸方金額(円)"},
+        {"name": "memo", "type": "string", "description": "摘要"}
+      ]
+    },
+    "account": {
+      "area": "会計",
+      "label": "勘定科目",
+      "description": "仕訳の分類",
+      "fields": [
+        {"name": "account_code", "type": "string", "description": "勘定科目コード"},
+        {"name": "name", "type": "string", "description": "勘定科目名"},
+        {"name": "category", "type": "string", "enum": ["資産", "負債", "純資産", "収益", "費用"], "description": "大分類"}
+      ]
+    },
+    "employee": {
+      "area": "人事",
+      "label": "従業員",
+      "description": "従業員の基本情報",
+      "fields": [
+        {"name": "employee_id", "type": "string", "description": "従業員ID"},
+        {"name": "name", "type": "string", "description": "氏名"},
+        {"name": "department_code", "type": "string", "description": "所属の部門コード"},
+        {"name": "position", "type": "string", "description": "役職"},
+        {"name": "hire_date", "type": "date", "description": "入社日"},
+        {"name": "employment_type", "type": "string", "enum": ["正社員", "契約社員", "パート"], "description": "雇用形態"}
+      ]
+    },
+    "attendance": {
+      "area": "人事",
+      "label": "勤怠",
+      "description": "従業員の日ごとの勤怠",
+      "fields": [
+        {"name": "employee_id", "type": "string", "description": "従業員ID"},
+        {"name": "work_date", "type": "date", "description": "日付"},
+        {"name": "clock_in", "type": "string", "description": "出勤時刻(HH:MM)"},
+        {"name": "clock_out", "type": "string", "description": "退勤時刻(HH:MM)"},
+        {"name": "overtime_minutes", "type": "integer", "description": "残業時間(分)"},
+        {"name": "leave_type", "type": "string", "enum": ["なし", "有給休暇", "特別休暇", "欠勤"], "description": "休暇の種類"}
+      ]
+    }
+  }
+}

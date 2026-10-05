@@ -1,7 +1,7 @@
 """Self-built MCP server, written against the SDK's low-level API.
 
-Exposes the 40 business tools from the catalog (bodies are the mock in
-system/tools/mock_server.py) plus one document retrieval tool. All 41 are
+Exposes the 4 business tools from the catalog (bodies are the mock in
+system/tools/mock_server.py) plus one document retrieval tool. All 5 are
 offered to the LLM, which decides when to search, the same way it decides
 which business tool to call.
 
@@ -31,25 +31,13 @@ DEFAULT_CORPUS_N = 10_000
 N_QUERY_VECTORS = 1_000
 DEFAULT_TOP_K = 5
 
-# toolcall-serving-bench's scoring annotation; meaningless to an LLM and
-# would only inflate the prompt.
-_BENCH_ONLY_KEYS = ("x-scoring",)
-
-
-def _strip_bench_keys(schema: Any) -> Any:
-    if isinstance(schema, dict):
-        return {k: _strip_bench_keys(v) for k, v in schema.items() if k not in _BENCH_ONLY_KEYS}
-    if isinstance(schema, list):
-        return [_strip_bench_keys(v) for v in schema]
-    return schema
-
 
 def _business_tools() -> list[types.Tool]:
     return [
         types.Tool(
             name=t["name"],
             description=t["description"],
-            input_schema=_strip_bench_keys(t["parameters"]),
+            input_schema=t["inputSchema"],
         )
         for t in load_catalog().values()
     ]
@@ -57,8 +45,8 @@ def _business_tools() -> list[types.Tool]:
 
 _RETRIEVAL_TOOL_DEF = types.Tool(
     name=RETRIEVAL_TOOL,
-    # Says "documents, not business records" up front: the catalog already has
-    # many search_* tools over business data, and a small model may mix them up.
+    # Says "documents, not business records" up front: find_records also
+    # searches, and a small model may mix the two up.
     description="社内文書(規程・手順書・マニュアル)から、質問に近い文書のIDを返す。売上・在庫などの業務データの検索には使わない。",
     input_schema={
         "type": "object",

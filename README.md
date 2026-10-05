@@ -56,7 +56,7 @@ MCPサーバはAmazon Bedrock AgentCore Runtime上で動かし、計装はOpenTe
 |---|---|---|
 | エージェント | Python・asyncio | LLMがツール(業務ツール・文書検索)を選んで呼び、結果を見て次を決めるループ |
 | LLM | llama.cpp(OpenAI互換API、手元のCPU) | 小さいモデルを使う。OpenAI互換なので、他の推論サーバにも接続先を変えるだけで差し替えられる |
-| ツール | 自作のMCPサーバ(公式Python SDKの低レベルAPI、Streamable HTTP) | 業務システム風のツールとモック実行(200〜800ms)、文書検索ツール。AgentCore Runtimeに預けて動かす(業務ツールの構成は作り直し予定。下記) |
+| ツール | 自作のMCPサーバ(公式Python SDKの低レベルAPI、Streamable HTTP) | 業務ツール4つ(データの種類を引数で指定する汎用型)とモック実行(200〜800ms)、文書検索ツール。AgentCore Runtimeに預けて動かす |
 | 認証 | IAMの署名(SigV4) | 手元のAWSクレデンシャルで署名する |
 | RAG | RDS for PostgreSQL + pgvector | 検索はMCPサーバのツールの1つで、使うかどうかはLLMが決める。RDSはVPCの中だけに置き、インターネットに出さない |
 | 計装 | OpenTelemetry(GenAI規約・MCP規約) | トレースの文脈はMCPリクエストの`params._meta.traceparent`でサーバに渡す |
@@ -115,7 +115,7 @@ pgvectorに移る前に、手元のfaissで測った値。pgvectorでの値は�
 ```
 agent-latency-tracer/
 ├── system/                 # 観測対象のエージェント
-│   ├── tools/               # 業務ツールの定義 + モック実行
+│   ├── tools/               # 業務ツールの定義、データの種類と項目、モック実行
 │   ├── retrieval/            # 手元用の検索(faiss)
 │   ├── mcp_server/            # 自作MCPサーバ
 │   ├── mcp_client.py          # 計装つきMCPクライアント
@@ -132,9 +132,11 @@ agent-latency-tracer/
 └── docs/
     ├── DESIGN.md               # 設計書(現状と次にやること)
     ├── latency-pitfalls-survey.md  # 事例の調査メモ(出典つき)
+    ├── tool-catalog-survey.md     # 業務ツールの形を決めるための調査メモ
     └── runbook.md              # 切り分けの手順書(作成予定)
 ```
 
-今の業務ツールの定義(40個)は、別リポジトリ`toolcall-serving-bench`の`schema/tools.json`(汎用的な業務システムの
-語彙で作ったツールカタログ)を仮に取り込んだもの。あちらはツール選択の精度を測るために、似た機能のツールを
-わざと並べてあるので、このプロジェクト用に作り直す(方針は[設計書](docs/DESIGN.md)§6の2b)。
+業務ツールは、公開されている業務システムのMCPサーバに多い汎用型にした。データの構造を調べる`describe_data`、
+探す`find_records`、1件取る`get_record`、集計する`aggregate_records`の4つで、データの種類(販売・購買・在庫・会計・
+人事と共通マスタの15種類)は引数で指定する。種類と項目は`system/tools/data_schema.json`。決めた経緯は
+[設計書](docs/DESIGN.md)§6の2bと[調査メモ](docs/tool-catalog-survey.md)。

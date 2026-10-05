@@ -48,18 +48,16 @@ def _payload(result) -> dict:
     return json.loads(result.content[0].text)
 
 
-def test_lists_forty_business_tools_plus_retrieval():
+def test_lists_four_business_tools_plus_retrieval():
     tools = _with_client(lambda c: c.list_tools())
     names = [t.name for t in tools]
-    assert len(names) == 41
-    assert names[-1] == RETRIEVAL_TOOL
-    assert "x-scoring" not in json.dumps([t.input_schema for t in tools])
+    assert names == ["describe_data", "find_records", "get_record", "aggregate_records", RETRIEVAL_TOOL]
 
 
 def test_business_tool_returns_mock_result():
-    result = _with_client(lambda c: c.call_tool("search_master", {"entity": "item"}))
+    result = _with_client(lambda c: c.call_tool("find_records", {"type": "item"}))
     assert not result.is_error
-    assert _payload(result) == {"tool": "search_master", "arguments": {"entity": "item"}, "status": "ok"}
+    assert _payload(result) == {"tool": "find_records", "arguments": {"type": "item"}, "status": "ok"}
 
 
 def test_retrieval_same_query_hits_same_documents():
@@ -85,12 +83,12 @@ def _spans_by_name():
 def test_server_span_nests_under_agent_execute_tool_span():
     async def call_under_root(c):
         with invoke_agent_span(get_tracer(_PROVIDER), agent_name="test"):
-            await c.call_tool("search_master", {"entity": "item"})
+            await c.call_tool("find_records", {"type": "item"})
 
     _with_client(call_under_root)
     spans = _spans_by_name()
-    agent = spans["execute_tool search_master"]
-    server = spans["tools/call search_master"]
+    agent = spans["execute_tool find_records"]
+    server = spans["tools/call find_records"]
     # In-process there is no JSON-RPC framing, so the SDK's "MCP send" client
     # span is skipped and the server span hangs directly off ours. Over HTTP
     # the client span sits in between and traceparent carries the context;
@@ -100,7 +98,7 @@ def test_server_span_nests_under_agent_execute_tool_span():
 
 
 def test_otel_off_server_emits_no_server_spans():
-    _with_client(lambda c: c.call_tool("search_master", {"entity": "item"}), otel=False)
+    _with_client(lambda c: c.call_tool("find_records", {"type": "item"}), otel=False)
     names = set(_spans_by_name())
-    assert "execute_tool search_master" in names
-    assert "tools/call search_master" not in names
+    assert "execute_tool find_records" in names
+    assert "tools/call find_records" not in names
