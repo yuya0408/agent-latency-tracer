@@ -18,6 +18,7 @@
 | 手元での開発 | AWS無しでも動く形を残す(検索はfaiss、トレースは自作SQLite＋waterfall) | 開発中の確認と、AWSを使わない読み手のため |
 | 事例の書き方 | 事例ごとに1ファイル。落とし穴ありと修正済みを並べる | 落とし穴のコードそのものが読めるようにする |
 | 公開する根拠 | トレースをJSONで書き出し、waterfall画像と一緒に`traces/`に置く。アカウントID・ARNは伏せる | 読み手がAWS無しで結果を確かめられるようにする |
+| 手元の実行環境 | WSLのUbuntu。エージェント・テスト・開発中のMCPサーバはWSLのvenv、llama.cppは公式のDockerイメージ。リポジトリ・venv・トレースのSQLiteはWSLのホーム側に置く | このPCではスマートアプリコントロールが署名の無いDLL(faiss)を止める。通信がWindowsとWSLをまたがないようそろえる。本番(AgentCore)もLinuxのコンテナ。`/mnt/c`越しのファイルの読み書きは遅く、測定に混ざる |
 | インフラ | Terraform。使うときに作り、終わったら消す。状態ファイルは既存のS3バケットに別キーで保存 | 費用を抑える。状態ファイルにはパスワードが入るためリポジトリに置かない |
 
 ## 2. 全体の流れ
@@ -134,7 +135,7 @@
     - **書き込みの操作は入れない。** 事例集の遅延は読み取りで再現できる
     - **`find_records`の`limit`は既定100・上限2000。** 既定はodata_mcp_go、上限はSalesforceの値。外した版はM4の落とし穴の候補
     - 条件(`filter`)は`{field, op, value}`の並び(ANDだけ)。実例に多いクエリ文字列より、引数の形として検証しやすい
-- [ ] 3. llama.cppの速度を測り、エージェントループを手元で組む
+- [ ] 3. llama.cppの速度を測り、エージェントループを手元で組む。最初にWSLでの環境作り(venv、テストの通過確認、WSL2のメモリ上限の確認)
 - [ ] 4. Terraform: VPC・RDS(pgvector)・AgentCore・CloudWatch。データ投入と、pgvectorの検索の計測
 - [ ] 5. MCPサーバをAgentCoreに預け、トレースをCloudWatchに集める
 - [ ] 6. 事例を1つずつ再現し、手順書に書き、トレースを書き出す
@@ -172,6 +173,8 @@
 - 手元のfaissでの検索の実測値はREADMEの「検索についての実測メモ」
 - venv: `.venv/Scripts/python.exe`(システムPythonにはfaissが無い)
 - 2026-10-06時点で、このPCではWindowsのスマートアプリコントロールがfaissのDLLの読み込みを止める。faissを読み込む
-  テスト(`test_retrieval.py`・`test_mcp.py`)とMCPサーバは、Windows側では動かない(対処は未定)
+  テスト(`test_retrieval.py`・`test_mcp.py`)とMCPサーバは、Windows側では動かない(10-04までは動いていた)。対処は手元の
+  実行環境をWSLに移すこと(§1)。2aのSQLiteの値・READMEのfaissの実測値はWindows側での値
+- WSL2が使えるメモリは初期設定で約6GB(PCの半分)。WSLのPythonは3.14(Windows側のvenvは3.13)
 - AWS: 既存アカウント(東京リージョン)、月60ドルの予算アラートあり。**AWS CLIとTerraformはWSLのUbuntuから使う**
   (Windows側には入っていない。クレデンシャルもUbuntu側の`~/.aws`)
