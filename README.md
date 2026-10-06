@@ -65,11 +65,14 @@ MCPサーバはAmazon Bedrock AgentCore Runtime上で動かし、計装はOpenTe
 **手元だけでも動く。** MCPサーバとエージェントはAWSを使わずに手元で動かせる(検索はfaiss、トレースは
 自作のSQLite保存と単一HTMLのwaterfallビューア)。開発中の確認と、AWSを使わずにコードを試したい読み手のため。
 
-```powershell
+```bash
+# Linux(WindowsではWSL)で。venvは ~/.venvs/agent-latency-tracer に作り、pip install -e ".[dev]"
+# トレースの保存先は、測定中の書き込みが遅くならないよう、Linux側のディスクに置く
+export TRACE_DB=~/traces/traces.db
 # ターミナル1: MCPサーバ(127.0.0.1:8000/mcp)
-.venv\Scripts\python.exe -m system.mcp_server
+~/.venvs/agent-latency-tracer/bin/python -m system.mcp_server
 # ターミナル2: ツールを3つ「1つずつ」と「同時に」呼び、waterfallをout/に出す
-.venv\Scripts\python.exe scripts\try_mcp.py
+~/.venvs/agent-latency-tracer/bin/python scripts/try_mcp.py
 ```
 
 **MCPサーバ側の計装はオン/オフを切り替えられるようにする。** サーバが別の言語・別のチームで作られていて
