@@ -18,7 +18,7 @@
 | 手元での開発 | AWS無しでも動く形を残す(検索はfaiss、トレースは自作SQLite＋waterfall) | 開発中の確認と、AWSを使わない読み手のため |
 | 事例の書き方 | 事例ごとに1ファイル。落とし穴ありと修正済みを並べる | 落とし穴のコードそのものが読めるようにする |
 | 公開する根拠 | トレースをJSONで書き出し、waterfall画像と一緒に`traces/`に置く。アカウントID・ARNは伏せる | 読み手がAWS無しで結果を確かめられるようにする |
-| 手元の実行環境 | WSLのUbuntu。エージェント・テスト・開発中のMCPサーバはWSLのvenv、llama.cppは公式のDockerイメージ。リポジトリ・venv・トレースのSQLiteはWSLのホーム側に置く | このPCではスマートアプリコントロールが署名の無いDLL(faiss)を止める。通信がWindowsとWSLをまたがないようそろえる。本番(AgentCore)もLinuxのコンテナ。`/mnt/c`越しのファイルの読み書きは遅く、測定に混ざる |
+| 手元の実行環境 | WSLのUbuntu。エージェント・テスト・開発中のMCPサーバはWSLのvenv、llama.cppは公式のDockerイメージ。venvと、測定中に書き込むトレースのSQLiteはWSLのホーム側に置く。リポジトリはWindows側のまま、WSLから`/mnt/c`越しに実行する | このPCではスマートアプリコントロールが署名の無いDLL(faiss)を止める。通信がWindowsとWSLをまたがないようそろえる。本番(AgentCore)もLinuxのコンテナ。`/mnt/c`越しのファイルの読み書きは遅いが、コードを読むのは起動時だけなので測定には混ざらない |
 | インフラ | Terraform。使うときに作り、終わったら消す。状態ファイルは既存のS3バケットに別キーで保存 | 費用を抑える。状態ファイルにはパスワードが入るためリポジトリに置かない |
 
 ## 2. 全体の流れ
@@ -171,10 +171,12 @@
 
 - PCメモリ総量 13.74GB。大きな配列を作る前に空きを確認する
 - 手元のfaissでの検索の実測値はREADMEの「検索についての実測メモ」
-- venv: `.venv/Scripts/python.exe`(システムPythonにはfaissが無い)
+- venv: WSLの`~/.venvs/agent-latency-tracer`(Python 3.14.4、faiss 1.15.1。2026-10-06作成、全テスト通過)。
+  Windows側の`.venv/Scripts/python.exe`(3.13)はfaissが読み込めないため、faissを使わない作業にだけ使える
 - 2026-10-06時点で、このPCではWindowsのスマートアプリコントロールがfaissのDLLの読み込みを止める。faissを読み込む
   テスト(`test_retrieval.py`・`test_mcp.py`)とMCPサーバは、Windows側では動かない(10-04までは動いていた)。対処は手元の
   実行環境をWSLに移すこと(§1)。2aのSQLiteの値・READMEのfaissの実測値はWindows側での値
-- WSL2が使えるメモリは初期設定で約6GB(PCの半分)。WSLのPythonは3.14(Windows側のvenvは3.13)
+- WSL2が使えるメモリは初期設定で約6GB(PCの半分)
+- WSLでの`try_mcp.py`(2026-10-06): `MCP send tools/call`とサーバの`tools/call`の差は6〜7ms(Windowsでの2aの対処後は3〜11ms)
 - AWS: 既存アカウント(東京リージョン)、月60ドルの予算アラートあり。**AWS CLIとTerraformはWSLのUbuntuから使う**
   (Windows側には入っていない。クレデンシャルもUbuntu側の`~/.aws`)
