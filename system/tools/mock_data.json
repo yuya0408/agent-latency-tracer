@@ -1,0 +1,115 @@
+{
+  "$comment": "業務ツールのモックが返す合成データ。会話が自然に進んで止まるよう、仮の質問(docs/DESIGN.md §6の3)に答えられる中身にしてある。行の項目は data_schema.json と同じ。lines は受注・発注の明細で、get_record だけが返す。",
+  "rows": {
+    "partner": [
+      {"partner_id": "P001", "name": "A社", "kind": "販売先", "payment_terms_days": 30},
+      {"partner_id": "P002", "name": "B社", "kind": "仕入先", "payment_terms_days": 60},
+      {"partner_id": "P003", "name": "C社", "kind": "両方", "payment_terms_days": 45},
+      {"partner_id": "P004", "name": "D社", "kind": "販売先", "payment_terms_days": 30}
+    ],
+    "item": [
+      {"item_code": "X001", "name": "ボルトM8", "category": "締結部品", "unit": "個", "standard_price": 12},
+      {"item_code": "X002", "name": "ナットM8", "category": "締結部品", "unit": "個", "standard_price": 5},
+      {"item_code": "X003", "name": "ワッシャーM8", "category": "締結部品", "unit": "個", "standard_price": 2},
+      {"item_code": "Y001", "name": "鋼板1.6mm", "category": "素材", "unit": "枚", "standard_price": 3200}
+    ],
+    "department": [
+      {"department_code": "D000", "name": "本社", "parent_department_code": ""},
+      {"department_code": "D100", "name": "営業部", "parent_department_code": "D000"},
+      {"department_code": "D200", "name": "購買部", "parent_department_code": "D000"},
+      {"department_code": "D300", "name": "物流部", "parent_department_code": "D000"},
+      {"department_code": "D400", "name": "経理部", "parent_department_code": "D000"}
+    ],
+    "sales_order": [
+      {"order_id": "SO-1003", "partner_id": "P001", "partner_name": "A社", "order_date": "2026-08-30", "delivery_date": "2026-09-15", "amount": 300000, "status": "出荷済"},
+      {"order_id": "SO-1021", "partner_id": "P004", "partner_name": "D社", "order_date": "2026-09-05", "delivery_date": "2026-09-30", "amount": 90000, "status": "出荷済"},
+      {"order_id": "SO-1042", "partner_id": "P001", "partner_name": "A社", "order_date": "2026-09-12", "delivery_date": "2026-10-10", "amount": 480000, "status": "未出荷"},
+      {"order_id": "SO-1048", "partner_id": "P003", "partner_name": "C社", "order_date": "2026-09-18", "delivery_date": "2026-10-05", "amount": 210000, "status": "一部出荷"},
+      {"order_id": "SO-1057", "partner_id": "P001", "partner_name": "A社", "order_date": "2026-09-25", "delivery_date": "2026-10-20", "amount": 125000, "status": "未出荷"},
+      {"order_id": "SO-1063", "partner_id": "P004", "partner_name": "D社", "order_date": "2026-10-02", "delivery_date": "2026-10-25", "amount": 64000, "status": "未出荷"}
+    ],
+    "shipment": [
+      {"shipment_id": "SH-2001", "order_id": "SO-1003", "ship_date": "2026-09-14", "warehouse": "東京倉庫", "status": "出荷済"},
+      {"shipment_id": "SH-2002", "order_id": "SO-1021", "ship_date": "2026-09-29", "warehouse": "東京倉庫", "status": "出荷済"},
+      {"shipment_id": "SH-2003", "order_id": "SO-1048", "ship_date": "2026-10-03", "warehouse": "東京倉庫", "status": "出荷済"}
+    ],
+    "sales_invoice": [
+      {"invoice_id": "SI-3001", "partner_id": "P001", "partner_name": "A社", "invoice_date": "2026-09-30", "due_date": "2026-10-31", "amount": 330000, "status": "未入金"},
+      {"invoice_id": "SI-3002", "partner_id": "P004", "partner_name": "D社", "invoice_date": "2026-09-30", "due_date": "2026-10-31", "amount": 99000, "status": "入金済"}
+    ],
+    "purchase_order": [
+      {"po_id": "PO-5011", "partner_id": "P002", "partner_name": "B社", "order_date": "2026-09-08", "expected_date": "2026-09-20", "amount": 1200000, "status": "入荷済"},
+      {"po_id": "PO-5019", "partner_id": "P002", "partner_name": "B社", "order_date": "2026-09-22", "expected_date": "2026-10-09", "amount": 360000, "status": "未入荷"},
+      {"po_id": "PO-5024", "partner_id": "P003", "partner_name": "C社", "order_date": "2026-09-29", "expected_date": "2026-10-14", "amount": 96000, "status": "一部入荷"},
+      {"po_id": "PO-5030", "partner_id": "P002", "partner_name": "B社", "order_date": "2026-10-01", "expected_date": "2026-10-16", "amount": 640000, "status": "未入荷"}
+    ],
+    "goods_receipt": [
+      {"receipt_id": "GR-6001", "po_id": "PO-5011", "receipt_date": "2026-09-19", "warehouse": "東京倉庫", "status": "検収済"},
+      {"receipt_id": "GR-6002", "po_id": "PO-5024", "receipt_date": "2026-10-06", "warehouse": "大阪倉庫", "status": "検品中"}
+    ],
+    "purchase_invoice": [
+      {"invoice_id": "PI-7001", "partner_id": "P002", "partner_name": "B社", "invoice_date": "2026-09-25", "due_date": "2026-10-31", "amount": 1320000, "status": "未払"},
+      {"invoice_id": "PI-7002", "partner_id": "P002", "partner_name": "B社", "invoice_date": "2026-08-25", "due_date": "2026-09-30", "amount": 550000, "status": "支払済"},
+      {"invoice_id": "PI-7003", "partner_id": "P003", "partner_name": "C社", "invoice_date": "2026-09-30", "due_date": "2026-11-30", "amount": 105600, "status": "未払"},
+      {"invoice_id": "PI-7004", "partner_id": "P002", "partner_name": "B社", "invoice_date": "2026-10-05", "due_date": "2026-11-30", "amount": 396000, "status": "未払"}
+    ],
+    "stock_balance": [
+      {"balance_id": "SB-0001", "item_code": "X001", "item_name": "ボルトM8", "warehouse": "東京倉庫", "quantity": 1200, "allocated_quantity": 300},
+      {"balance_id": "SB-0002", "item_code": "X001", "item_name": "ボルトM8", "warehouse": "大阪倉庫", "quantity": 400, "allocated_quantity": 0},
+      {"balance_id": "SB-0003", "item_code": "X002", "item_name": "ナットM8", "warehouse": "東京倉庫", "quantity": 5000, "allocated_quantity": 2400},
+      {"balance_id": "SB-0004", "item_code": "X003", "item_name": "ワッシャーM8", "warehouse": "大阪倉庫", "quantity": 30000, "allocated_quantity": 2500},
+      {"balance_id": "SB-0005", "item_code": "Y001", "item_name": "鋼板1.6mm", "warehouse": "東京倉庫", "quantity": 650, "allocated_quantity": 50}
+    ],
+    "stock_movement": [
+      {"movement_id": "SM-8001", "item_code": "X001", "warehouse": "東京倉庫", "movement_date": "2026-09-14", "kind": "出庫", "quantity": -25000, "source_id": "SH-2001"},
+      {"movement_id": "SM-8002", "item_code": "Y001", "warehouse": "東京倉庫", "movement_date": "2026-09-19", "kind": "入庫", "quantity": 500, "source_id": "GR-6001"},
+      {"movement_id": "SM-8003", "item_code": "X002", "warehouse": "東京倉庫", "movement_date": "2026-09-29", "kind": "出庫", "quantity": -18000, "source_id": "SH-2002"},
+      {"movement_id": "SM-8004", "item_code": "Y001", "warehouse": "東京倉庫", "movement_date": "2026-10-03", "kind": "出庫", "quantity": -50, "source_id": "SH-2003"}
+    ],
+    "journal_entry": [
+      {"line_id": "JL-0001", "entry_id": "JE-9001", "entry_date": "2026-09-30", "account_code": "1130", "account_name": "売掛金", "department_code": "D100", "debit_amount": 330000, "credit_amount": 0, "memo": "A社 9月請求"},
+      {"line_id": "JL-0002", "entry_id": "JE-9001", "entry_date": "2026-09-30", "account_code": "4110", "account_name": "売上高", "department_code": "D100", "debit_amount": 0, "credit_amount": 300000, "memo": "A社 9月請求"},
+      {"line_id": "JL-0003", "entry_id": "JE-9001", "entry_date": "2026-09-30", "account_code": "2191", "account_name": "仮受消費税", "department_code": "D100", "debit_amount": 0, "credit_amount": 30000, "memo": "A社 9月請求"},
+      {"line_id": "JL-0004", "entry_id": "JE-9002", "entry_date": "2026-09-25", "account_code": "5110", "account_name": "仕入高", "department_code": "D200", "debit_amount": 1200000, "credit_amount": 0, "memo": "B社 鋼板仕入"},
+      {"line_id": "JL-0005", "entry_id": "JE-9002", "entry_date": "2026-09-25", "account_code": "1190", "account_name": "仮払消費税", "department_code": "D200", "debit_amount": 120000, "credit_amount": 0, "memo": "B社 鋼板仕入"},
+      {"line_id": "JL-0006", "entry_id": "JE-9002", "entry_date": "2026-09-25", "account_code": "2110", "account_name": "買掛金", "department_code": "D200", "debit_amount": 0, "credit_amount": 1320000, "memo": "B社 鋼板仕入"}
+    ],
+    "account": [
+      {"account_code": "1130", "name": "売掛金", "category": "資産"},
+      {"account_code": "1190", "name": "仮払消費税", "category": "資産"},
+      {"account_code": "2110", "name": "買掛金", "category": "負債"},
+      {"account_code": "2191", "name": "仮受消費税", "category": "負債"},
+      {"account_code": "4110", "name": "売上高", "category": "収益"},
+      {"account_code": "5110", "name": "仕入高", "category": "費用"},
+      {"account_code": "6210", "name": "旅費交通費", "category": "費用"}
+    ],
+    "employee": [
+      {"employee_id": "E001", "name": "山田太郎", "department_code": "D100", "position": "課長", "hire_date": "2015-04-01", "employment_type": "正社員"},
+      {"employee_id": "E002", "name": "佐藤花子", "department_code": "D100", "position": "主任", "hire_date": "2019-04-01", "employment_type": "正社員"},
+      {"employee_id": "E003", "name": "鈴木一郎", "department_code": "D200", "position": "担当", "hire_date": "2022-10-01", "employment_type": "契約社員"},
+      {"employee_id": "E004", "name": "高橋美咲", "department_code": "D400", "position": "担当", "hire_date": "2024-04-01", "employment_type": "パート"}
+    ],
+    "attendance": [
+      {"attendance_id": "AT-0001", "employee_id": "E001", "work_date": "2026-09-30", "clock_in": "08:55", "clock_out": "20:10", "overtime_minutes": 135, "leave_type": "なし"},
+      {"attendance_id": "AT-0002", "employee_id": "E002", "work_date": "2026-09-30", "clock_in": "09:00", "clock_out": "18:05", "overtime_minutes": 5, "leave_type": "なし"},
+      {"attendance_id": "AT-0003", "employee_id": "E003", "work_date": "2026-09-30", "clock_in": "", "clock_out": "", "overtime_minutes": 0, "leave_type": "有給休暇"},
+      {"attendance_id": "AT-0004", "employee_id": "E001", "work_date": "2026-10-01", "clock_in": "09:02", "clock_out": "19:30", "overtime_minutes": 88, "leave_type": "なし"}
+    ]
+  },
+  "lines": {
+    "SO-1003": [{"item_code": "X001", "item_name": "ボルトM8", "quantity": 25000, "unit_price": 12}],
+    "SO-1021": [{"item_code": "X002", "item_name": "ナットM8", "quantity": 18000, "unit_price": 5}],
+    "SO-1042": [{"item_code": "X001", "item_name": "ボルトM8", "quantity": 30000, "unit_price": 12},
+                {"item_code": "X002", "item_name": "ナットM8", "quantity": 24000, "unit_price": 5}],
+    "SO-1048": [{"item_code": "Y001", "item_name": "鋼板1.6mm", "quantity": 50, "unit_price": 3200},
+                {"item_code": "X003", "item_name": "ワッシャーM8", "quantity": 25000, "unit_price": 2}],
+    "SO-1057": [{"item_code": "X001", "item_name": "ボルトM8", "quantity": 10000, "unit_price": 12},
+                {"item_code": "X003", "item_name": "ワッシャーM8", "quantity": 2500, "unit_price": 2}],
+    "SO-1063": [{"item_code": "X002", "item_name": "ナットM8", "quantity": 12800, "unit_price": 5}],
+    "PO-5011": [{"item_code": "Y001", "item_name": "鋼板1.6mm", "quantity": 500, "unit_price": 2400}],
+    "PO-5019": [{"item_code": "X001", "item_name": "ボルトM8", "quantity": 45000, "unit_price": 8}],
+    "PO-5024": [{"item_code": "X002", "item_name": "ナットM8", "quantity": 24000, "unit_price": 4}],
+    "PO-5030": [{"item_code": "X001", "item_name": "ボルトM8", "quantity": 50000, "unit_price": 8},
+                {"item_code": "Y001", "item_name": "鋼板1.6mm", "quantity": 100, "unit_price": 2400}]
+  }
+}

@@ -101,7 +101,8 @@ def build_server(*, otel: bool = True, corpus_n: int = DEFAULT_CORPUS_N) -> Serv
             ids = retriever.retrieve(arguments["query"], arguments.get("top_k", DEFAULT_TOP_K))
             return _text_result({"document_ids": ids})
         if params.name in business_names:
-            return _text_result(await call_mock_tool(params.name, arguments))
+            result = await call_mock_tool(params.name, arguments)
+            return _text_result(result, is_error=result["status"] == "error")
         return _text_result({"error": f"unknown tool: {params.name}"}, is_error=True)
 
     server = Server(SERVER_NAME, on_list_tools=on_list_tools, on_call_tool=on_call_tool)

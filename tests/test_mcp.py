@@ -57,7 +57,16 @@ def test_lists_four_business_tools_plus_retrieval():
 def test_business_tool_returns_mock_result():
     result = _with_client(lambda c: c.call_tool("find_records", {"type": "item"}))
     assert not result.is_error
-    assert _payload(result) == {"tool": "find_records", "arguments": {"type": "item"}, "status": "ok"}
+    payload = _payload(result)
+    assert payload["status"] == "ok"
+    assert payload["total"] == len(payload["records"]) == 4
+
+
+def test_business_tool_error_sets_is_error():
+    result = _with_client(lambda c: c.call_tool(
+        "find_records", {"type": "item", "filter": [{"field": "code", "op": "eq", "value": "X001"}]}))
+    assert result.is_error
+    assert _payload(result)["status"] == "error"
 
 
 def test_retrieval_same_query_hits_same_documents():

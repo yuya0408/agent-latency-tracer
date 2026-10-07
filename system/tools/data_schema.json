@@ -5,6 +5,7 @@
       "area": "共通",
       "label": "取引先",
       "description": "販売先・仕入先",
+      "id_field": "partner_id",
       "fields": [
         {"name": "partner_id", "type": "string", "description": "取引先ID"},
         {"name": "name", "type": "string", "description": "取引先名"},
@@ -16,6 +17,7 @@
       "area": "共通",
       "label": "品目",
       "description": "販売・購買・在庫で扱う品目",
+      "id_field": "item_code",
       "fields": [
         {"name": "item_code", "type": "string", "description": "品目コード"},
         {"name": "name", "type": "string", "description": "品目名"},
@@ -28,6 +30,7 @@
       "area": "共通",
       "label": "部門",
       "description": "組織の部門",
+      "id_field": "department_code",
       "fields": [
         {"name": "department_code", "type": "string", "description": "部門コード"},
         {"name": "name", "type": "string", "description": "部門名"},
@@ -38,6 +41,7 @@
       "area": "販売",
       "label": "受注",
       "description": "取引先から受けた注文。明細(品目・数量・単価)は get_record で返す",
+      "id_field": "order_id",
       "fields": [
         {"name": "order_id", "type": "string", "description": "受注ID"},
         {"name": "partner_id", "type": "string", "description": "取引先ID"},
@@ -52,6 +56,7 @@
       "area": "販売",
       "label": "出荷",
       "description": "受注に対する出荷",
+      "id_field": "shipment_id",
       "fields": [
         {"name": "shipment_id", "type": "string", "description": "出荷ID"},
         {"name": "order_id", "type": "string", "description": "元の受注ID"},
@@ -64,6 +69,7 @@
       "area": "販売",
       "label": "請求",
       "description": "取引先への請求",
+      "id_field": "invoice_id",
       "fields": [
         {"name": "invoice_id", "type": "string", "description": "請求ID"},
         {"name": "partner_id", "type": "string", "description": "取引先ID"},
@@ -78,6 +84,7 @@
       "area": "購買",
       "label": "発注",
       "description": "仕入先への注文。明細(品目・数量・単価)は get_record で返す",
+      "id_field": "po_id",
       "fields": [
         {"name": "po_id", "type": "string", "description": "発注ID"},
         {"name": "partner_id", "type": "string", "description": "取引先ID"},
@@ -92,6 +99,7 @@
       "area": "購買",
       "label": "入荷",
       "description": "発注に対する入荷",
+      "id_field": "receipt_id",
       "fields": [
         {"name": "receipt_id", "type": "string", "description": "入荷ID"},
         {"name": "po_id", "type": "string", "description": "元の発注ID"},
@@ -104,6 +112,7 @@
       "area": "購買",
       "label": "仕入請求",
       "description": "仕入先からの請求",
+      "id_field": "invoice_id",
       "fields": [
         {"name": "invoice_id", "type": "string", "description": "仕入請求ID"},
         {"name": "partner_id", "type": "string", "description": "取引先ID"},
@@ -118,7 +127,9 @@
       "area": "在庫",
       "label": "在庫残高",
       "description": "品目・倉庫ごとの現在の在庫",
+      "id_field": "balance_id",
       "fields": [
+        {"name": "balance_id", "type": "string", "description": "在庫残高ID"},
         {"name": "item_code", "type": "string", "description": "品目コード"},
         {"name": "item_name", "type": "string", "description": "品目名"},
         {"name": "warehouse", "type": "string", "description": "倉庫"},
@@ -130,6 +141,7 @@
       "area": "在庫",
       "label": "入出庫",
       "description": "在庫の増減の履歴",
+      "id_field": "movement_id",
       "fields": [
         {"name": "movement_id", "type": "string", "description": "入出庫ID"},
         {"name": "item_code", "type": "string", "description": "品目コード"},
@@ -144,7 +156,9 @@
       "area": "会計",
       "label": "仕訳",
       "description": "会計の仕訳。1行が1つの勘定科目の借方または貸方",
+      "id_field": "line_id",
       "fields": [
+        {"name": "line_id", "type": "string", "description": "仕訳行ID"},
         {"name": "entry_id", "type": "string", "description": "仕訳ID"},
         {"name": "entry_date", "type": "date", "description": "計上日"},
         {"name": "account_code", "type": "string", "description": "勘定科目コード"},
@@ -159,6 +173,7 @@
       "area": "会計",
       "label": "勘定科目",
       "description": "仕訳の分類",
+      "id_field": "account_code",
       "fields": [
         {"name": "account_code", "type": "string", "description": "勘定科目コード"},
         {"name": "name", "type": "string", "description": "勘定科目名"},
@@ -169,6 +184,7 @@
       "area": "人事",
       "label": "従業員",
       "description": "従業員の基本情報",
+      "id_field": "employee_id",
       "fields": [
         {"name": "employee_id", "type": "string", "description": "従業員ID"},
         {"name": "name", "type": "string", "description": "氏名"},
@@ -182,7 +198,9 @@
       "area": "人事",
       "label": "勤怠",
       "description": "従業員の日ごとの勤怠",
+      "id_field": "attendance_id",
       "fields": [
+        {"name": "attendance_id", "type": "string", "description": "勤怠ID"},
         {"name": "employee_id", "type": "string", "description": "従業員ID"},
         {"name": "work_date", "type": "date", "description": "日付"},
         {"name": "clock_in", "type": "string", "description": "出勤時刻(HH:MM)"},
