@@ -13,7 +13,7 @@
 | 認証 | IAMの署名(SigV4) | 手元のクレデンシャルで済み、Cognito(ユーザー管理)が要らない |
 | RAG | RDS for PostgreSQL + pgvector、VPCの中だけ | 検索はMCPサーバのツールの1つで、使うかどうかはLLMが決める。AgentCoreのVPCモードでRDSにつなぎ、RDSはインターネットに出さない |
 | MCPのSDKとプロトコルの版 | 公式Python SDK `mcp==2.3.0`(低レベルAPI)。プロトコルはSDKの初期設定のまま(2026-07-28版。相手が古い版なら自動で切り替わる) | 新しく作るなら何も指定しない状態が自然。古い版に固定する理由(「今は古い版が多い」)は推測にすぎなかった |
-| LLM | 手元のllama.cpp(小さいモデル) | GPU費用を避ける。小さいモデルの思わぬ動きも観測の対象にする。偽LLMは自動テストの中だけで使う |
+| LLM | 手元のllama.cpp(公式Dockerイメージ`ghcr.io/ggml-org/llama.cpp:server`、b11434)で、Qwen3.5-2B(Q4_K_M、1.28GB)。考える過程の出力(thinking)はオフ | GPU費用を避ける。小さいモデルの思わぬ動きも観測の対象にする。2Bは、1回の応答で独立したツール呼び出しを複数出し(#1の前提)、結果に中身があれば止まって答えることを確かめた(§8)。偽LLMは自動テストの中だけで使う |
 | トレースの集め先 | CloudWatch(Transaction Search) | AgentCoreの基盤側のspanと同じ場所に集める。実務で標準的なやり方 |
 | 手元での開発 | AWS無しでも動く形を残す(検索はfaiss、トレースは自作SQLite＋waterfall) | 開発中の確認と、AWSを使わない読み手のため |
 | 事例の書き方 | 事例ごとに1ファイル。落とし穴ありと修正済みを並べる | 落とし穴のコードそのものが読めるようにする |
@@ -47,7 +47,7 @@
 | [tracing/instrumentation.py](../tracing/instrumentation.py) | OTel GenAI規約・MCP規約のspan builder、グローバルProviderの登録。保存は`batch=True`で`BatchSpanProcessor`(テストは`SimpleSpanProcessor`) | ✅(TTFTを追加予定) |
 | [tracing/exporter.py](../tracing/exporter.py) | spanをSQLiteに保存(手元用) | ✅ |
 | [tracing/viewer/waterfall.py](../tracing/viewer/waterfall.py) | 単一HTMLのwaterfall(手元用) | ✅ |
-| [system/tools/](../system/tools/) | 業務ツール4つの定義(`catalog.json`)、データの種類と項目(`data_schema.json`)、モック実行(200〜800ms。中身を返すのは`describe_data`だけ) | ✅ |
+| [system/tools/](../system/tools/) | 業務ツール4つの定義(`catalog.json`)、データの種類と項目(`data_schema.json`)、合成データ(`mock_data.json`)、モック実行(200〜800ms待ってから、合成データを条件で絞り・集計して返す) | ✅ |
 | [system/retrieval/](../system/retrieval/) | 手元用の検索(faiss)、合成ベクトルの生成 | ✅(合成ベクトルはpgvectorへの投入にも使う) |
 | [system/mcp_server/](../system/mcp_server/) | 自作MCPサーバ(低レベルAPI、Streamable HTTP、`127.0.0.1:8000/mcp`)。業務ツール＋文書検索`retrieve_documents`。計装オンのときはHTTPリクエストごとのspan(`opentelemetry-instrumentation-asgi`)も出す。`MCP_SERVER_OTEL=0`で計装オフ | ✅ |
 | [system/mcp_client.py](../system/mcp_client.py) | SDKの`Client`を包み、tool呼び出しを`execute_tool` spanで囲む。HTTPヘッダにも`traceparent`を載せる(`httpx2`の`event_hooks`。SigV4の署名もここに足す見込み)。`async with`の間は接続を使い回す | ✅ |
@@ -107,8 +107,10 @@
   MCP protocol contract)。2026-07-28版で話すとき、SDKのクライアントがこのIDを送り返すかは未確認
 - **AgentCoreに載せるときのサーバ設定**: AgentCoreは`stateless_http=True`を推奨。今はSDKの初期設定(False)なので、
   載せるときに切り替える。ホストは`0.0.0.0`、ARM64のコンテナ
-- **ツールの結果に中身を持たせるか**: 今のモックは、`describe_data`(データの種類と項目)以外は呼ばれた内容と`"status": "ok"`しか返さない。§6の3でLLMを入れて、空の結果のせいで
-  LLMの動きが不自然になるなら、ツール名と引数から合成データを返す関数を足す
+- **ツールの結果に中身を持たせるか**(2026-10-08に解決): `{"status": "ok"}`だけを返すモックでは、LLMが作り話をしたり
+  同じ呼び出しを繰り返したりした。0件と明示する・条件を無視した仮の行を返す・小さな合成データを条件で絞る、の3通りを
+  試し、2段以上の質問が止まるのは最後だけだった。そこで、15種類それぞれ数件の合成データを持たせ、`filter`で絞って返す
+  形にした(DBの遅さを見るためではなく、会話を自然に進めるため。待ち時間は今までどおりモックの200〜800ms)
 
 ## 6. 次にやること
 
@@ -136,6 +138,11 @@
     - **`find_records`の`limit`は既定100・上限2000。** 既定はodata_mcp_go、上限はSalesforceの値。外した版はM4の落とし穴の候補
     - 条件(`filter`)は`{field, op, value}`の並び(ANDだけ)。実例に多いクエリ文字列より、引数の形として検証しやすい
 - [ ] 3. llama.cppの速度を測り、エージェントループを手元で組む。最初にWSLでの環境作り(venv、テストの通過確認、WSL2のメモリ上限の確認)
+  - [x] WSLのvenv、llama.cppの起動、速度の実測(§8)、ツール呼び出しの確認、モックへの合成データ(2026-10-08)
+  - [ ] OpenAI互換のクライアント(`system/llm/`)とエージェントループ(`system/agent.py`)
+  - 動作確認用の仮の質問(事例ごとの質問は§6の6で決める。評価用に固定するものではない):
+    1. A社の未出荷の受注は? 2. A社の未出荷の受注と、品目X001の在庫は? 3. 2026年9月の、取引先ごとの受注金額の合計は?
+    4. B社からの仕入請求で、支払期日が10月中のものは? 5. 品目X001の入荷待ちの発注は? 6. 出張旅費の精算のルールは?
 - [ ] 4. Terraform: VPC・RDS(pgvector)・AgentCore・CloudWatch。データ投入と、pgvectorの検索の計測
 - [ ] 5. MCPサーバをAgentCoreに預け、トレースをCloudWatchに集める
 - [ ] 6. 事例を1つずつ再現し、手順書に書き、トレースを書き出す
@@ -166,6 +173,10 @@
      こと自体は1個あたり約0.03msで、問題は保存のほう
 3. **計装は無料ではない。** 保存の方式しだいで、測っている対象そのものを遅くする。`BatchSpanProcessor`は止めない代わりに、
    保存まで最大`BATCH_EXPORT_INTERVAL_MS`(500ms)遅れ、終了時に`shutdown()`しないとキューに残ったspanが失われる
+4. **ツールの結果の形が、学習で見たものと違うとLLMが迷う。** 中身の無い`{"status": "ok"}`では、2Bが存在しない受注を答えたり、
+   同じ集計を繰り返して打ち切りになったりした。「0件」と分かる形で返すと止まる。往復の回数がそのまま遅延になる
+5. **小さいLLMの項目の選び間違いが、往復を増やす。** `describe_data`で項目を調べた後でも、取引先IDの項目に名前を入れる、
+   品目コードを`code`で探す、在庫を品目マスタで探す、といった誤りがあった。知らない項目名にはエラーで使える項目名を返す
 
 ## 8. 実測済みの前提値
 
@@ -177,6 +188,11 @@
   テスト(`test_retrieval.py`・`test_mcp.py`)とMCPサーバは、Windows側では動かない(10-04までは動いていた)。対処は手元の
   実行環境をWSLに移すこと(§1)。2aのSQLiteの値・READMEのfaissの実測値はWindows側での値
 - WSL2が使えるメモリは初期設定で約6GB(PCの半分)
+- **llama.cpp(Qwen3.5-2B、CPU 4スレッド、2026-10-07)**:
+  - 5ツールの定義は約1360トークン(質問だけなら21)
+  - prefill(プレフィックスキャッシュをオフにして測定)は毎秒約55トークンで、長さにほぼ比例: 1381トークンで24秒、2732で48秒、
+    6782で127秒。decodeは毎秒約12.7トークン
+  - キャッシュが効くと(初期設定)、2回目以降は新しく足された分だけを読む。1つの質問はLLM 3回前後で、合計30〜90秒
 - WSLでの`try_mcp.py`(2026-10-06): `MCP send tools/call`とサーバの`tools/call`の差は6〜7ms(Windowsでの2aの対処後は3〜11ms)
 - AWS: 既存アカウント(東京リージョン)、月60ドルの予算アラートあり。**AWS CLIとTerraformはWSLのUbuntuから使う**
   (Windows側には入っていない。クレデンシャルもUbuntu側の`~/.aws`)
