@@ -11,6 +11,7 @@ dependencies = [
     # Pinned: v2 API, and the server-side OTel middleware is still provisional.
     "mcp==2.3.0",
     "opentelemetry-instrumentation-asgi>=0.48b0",
+    "httpx2>=2.13",
 ]
 
 [project.optional-dependencies]

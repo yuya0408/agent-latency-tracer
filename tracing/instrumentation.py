@@ -35,6 +35,7 @@ AGENT_NAME = "gen_ai.agent.name"
 CONVERSATION_ID = "gen_ai.conversation.id"
 
 REQUEST_MODEL = "gen_ai.request.model"
+REQUEST_TEMPERATURE = "gen_ai.request.temperature"
 RESPONSE_MODEL = "gen_ai.response.model"
 RESPONSE_FINISH_REASONS = "gen_ai.response.finish_reasons"
 USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
@@ -225,6 +226,7 @@ def chat_span(
     *,
     request_model: str,
     provider_name: str,
+    temperature: float | None = None,
 ) -> Iterator[Span]:
     """Span for one generation call. Usage/response attributes are only known
     after the call returns -- set them with set_chat_usage before the `with`
@@ -235,6 +237,8 @@ def chat_span(
         REQUEST_MODEL: request_model,
         PROVIDER_NAME: provider_name,
     }
+    if temperature is not None:
+        attributes[REQUEST_TEMPERATURE] = temperature
     with tracer.start_as_current_span(
         f"chat {request_model}", kind=SpanKind.CLIENT, attributes=attributes
     ) as span:
