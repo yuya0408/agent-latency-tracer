@@ -73,6 +73,9 @@ export TRACE_DB=~/traces/traces.db
 ~/.venvs/agent-latency-tracer/bin/python -m system.mcp_server
 # ターミナル2: ツールを3つ「1つずつ」と「同時に」呼び、waterfallをout/に出す
 ~/.venvs/agent-latency-tracer/bin/python scripts/try_mcp.py
+# ターミナル2: 仮の質問をエージェントに流し、質問ごとのwaterfallをout/に出す
+# (llama.cppを127.0.0.1:8080で起動しておく。1問20〜60秒ほど)
+~/.venvs/agent-latency-tracer/bin/python scripts/run_agent.py
 ```
 
 **MCPサーバ側の計装はオン/オフを切り替えられるようにする。** サーバが別の言語・別のチームで作られていて
@@ -122,8 +125,8 @@ agent-latency-tracer/
 │   ├── retrieval/            # 手元用の検索(faiss)
 │   ├── mcp_server/            # 自作MCPサーバ
 │   ├── mcp_client.py          # 計装つきMCPクライアント
-│   ├── agent.py               # エージェントループ(作成予定)
-│   └── llm/                   # OpenAI互換クライアント(作成予定)
+│   ├── agent.py               # エージェントループ
+│   └── llm/                   # OpenAI互換クライアント
 ├── tracing/                  # 計装と、手元用の保存・可視化
 │   ├── instrumentation.py    # OTel span定義
 │   ├── exporter.py            # SQLiteへのexporter(手元用)
