@@ -1,0 +1,2 @@
+# Copy to backend.hcl (not committed) and put your own S3 bucket here.
+bucket = "<your-state-bucket>"

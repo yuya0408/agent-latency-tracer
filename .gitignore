@@ -7,3 +7,7 @@ venv/
 .pytest_cache/
 *.egg-info/
 out/
+infra/.terraform/
+infra/backend.hcl
+*.tfstate
+*.tfstate.*
