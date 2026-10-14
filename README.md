@@ -41,21 +41,23 @@ MCPサーバはAmazon Bedrock AgentCore Runtime上で動かし、計装はOpenTe
 ## 構成
 
 ```
-手元のPC                                      AWS(東京リージョン)
-┌──────────────────────┐                    ┌───────────────────────────────────────┐
-│ エージェント(Python)   │──MCP(SigV4署名)──▶│ AgentCore Runtime                      │
-│ LLM(llama.cpp)       │                    │   └ 自作MCPサーバ(コンテナ)             │
-└──────────┬───────────┘                    │        │ VPCモード                     │
-           │ トレース(OTLP)                 │        ▼                              │
-           │                                │   RDS for PostgreSQL + pgvector        │
-           └───────────────────────────────▶│ CloudWatch(トレース・メトリクス)        │
-                                            └───────────────────────────────────────┘
+手元のPC              AWS(東京リージョン)
+┌────────────┐       ┌──────────────────────────────────────────────────────┐
+│ 利用者役の    │       │ VPC                                                  │
+│ スクリプト    │──────▶│ AgentCore Runtime: エージェント(Python)               │
+└────────────┘ SigV4 │   ├ chat ─────────▶ GPUのEC2: 推論サーバ(Qwen3-8B)   │
+                     │   └ MCP(SigV4) ──▶ AgentCore Runtime: 自作MCPサーバ    │
+                     │                       └ 文書検索 ──▶ RDS + pgvector     │
+                     │ CloudWatch(トレース・メトリクス)                        │
+                     └──────────────────────────────────────────────────────┘
 ```
+
+開発中は、エージェントとLLM(llama.cpp、Qwen3.5-2B)を手元で動かす。
 
 | 部品 | 実装 | 補足 |
 |---|---|---|
-| エージェント | Python・asyncio | LLMがツール(業務ツール・文書検索)を選んで呼び、結果を見て次を決めるループ |
-| LLM | llama.cpp(OpenAI互換API、手元のCPU) | 小さいモデル(Qwen3.5-2B)を使う。OpenAI互換なので、他の推論サーバにも接続先を変えるだけで差し替えられる |
+| エージェント | Python・asyncio。AgentCore Runtimeで動かす | LLMがツール(業務ツール・文書検索)を選んで呼び、結果を見て次を決めるループ |
+| LLM | GPUのEC2上の推論サーバ(OpenAI互換API)で、Qwen3-8B。開発中は手元のllama.cppでQwen3.5-2B | 手元のCPUではLLMが時間のほとんどを占め、ツールや検索の遅れが埋もれるため、事例の再現はGPUで行う。OpenAI互換なので、接続先を変えるだけで差し替えられる |
 | ツール | 自作のMCPサーバ(公式Python SDKの低レベルAPI、Streamable HTTP) | 業務ツール4つ(データの種類を引数で指定する汎用型)とモック実行(200〜800ms待ってから、小さな合成データを返す)、文書検索ツール。AgentCore Runtimeに預けて動かす |
 | 認証 | IAMの署名(SigV4) | 手元のAWSクレデンシャルで署名する |
 | RAG | RDS for PostgreSQL + pgvector | 検索はMCPサーバのツールの1つで、使うかどうかはLLMが決める。RDSはVPCの中だけに置き、インターネットに出さない |
