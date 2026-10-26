@@ -23,7 +23,7 @@ resource "aws_db_instance" "main" {
   identifier     = "agent-latency-tracer"
   engine         = "postgres"
   engine_version = "18" # the default minor; the actual version is recorded with the measurements
-  instance_class = "db.t4g.micro"
+  instance_class = "db.t4g.medium" # the HNSW index (~400MB at 100,000 x 1024) fits in memory
 
   allocated_storage = 20
   storage_type      = "gp3"
