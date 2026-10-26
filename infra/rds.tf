@@ -22,8 +22,8 @@ resource "aws_vpc_security_group_ingress_rule" "rds_from_bastion" {
 resource "aws_db_instance" "main" {
   identifier     = "agent-latency-tracer"
   engine         = "postgres"
-  engine_version = "18" # the default minor; the actual version is recorded with the measurements
-  instance_class = "db.t4g.medium" # the HNSW index (~400MB at 100,000 x 1024) fits in memory
+  engine_version = "18"            # the default minor; the actual version is recorded with the measurements
+  instance_class = "db.t4g.medium" # the table and HNSW index at 100,000 x 1024 (533MB + 781MB) fit in memory
 
   allocated_storage = 20
   storage_type      = "gp3"
