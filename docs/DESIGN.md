@@ -22,7 +22,8 @@
 | 手元の実行環境 | WSLのUbuntu。エージェント・テスト・開発中のMCPサーバはWSLのvenv、llama.cppは公式のDockerイメージ。venvと、測定中に書き込むトレースのSQLiteはWSLのホーム側に置く。リポジトリはWindows側のまま、WSLから`/mnt/c`越しに実行する | このPCではスマートアプリコントロールが署名の無いDLL(faiss)を止める。通信がWindowsとWSLをまたがないようそろえる。本番(AgentCore)もLinuxのコンテナ。`/mnt/c`越しのファイルの読み書きは遅いが、コードを読むのは起動時だけなので測定には混ざらない |
 | インフラ | Terraform。使うときに作り、終わったら消す。状態ファイルは既存のS3バケットに別キーで保存 | 費用を抑える。状態ファイルにはアカウントIDやリソースのIDが入るためリポジトリに置かない |
 | 手元からRDSへの接続(作業用) | Session Managerのポート転送。踏み台のEC2(t4g.nano、公開IPなし、受け入れの許可なし)と、SSMのインターフェース型エンドポイント3つ(ssm・ssmmessages・ec2messages)を、1つ目のサブネットに置く。RDSと一緒に作って消す | 表を作る・データを入れる・測るための裏口で、本ランの経路(AgentCore→RDS)には入らない。AWSがRDS向けの手順を公式に出している定番。EC2 Instance Connect Endpointは無料だが、公式の手順はEC2向けだけで、RDSへ直接つなぐ例は第三者のものしかなく、使えるポートの記述も食い違っていたので採らなかった。SSHで入る公開の踏み台は、インターネットゲートウェイが要るので採らない |
-| RDSの設定 | PostgreSQL 18(小さい版の番号は固定しない)、db.t4g.micro、パスワードはRDSに作らせSecrets Managerに置く(`manage_master_user_password`)、踏み台と同じAZ、バックアップなし | 18はRDSの初期設定。小さい版まで固定すると、その版が選べなくなったときに作れなくなるので、代わりに測るときの実際の版を§8に記録する。パスワードが状態ファイルに入らない。AZをまたぐ1ms前後の遅れを検索の時間に混ぜない |
+| RDSの設定 | PostgreSQL 18(小さい版の番号は固定しない)、db.t4g.medium(メモリ4GB)、パスワードはRDSに作らせSecrets Managerに置く(`manage_master_user_password`)、踏み台と同じAZ、バックアップなし | 18はRDSの初期設定。小さい版まで固定すると、その版が選べなくなったときに作れなくなるので、代わりに測るときの実際の版を§8に記録する。mediumは、表とHNSWのインデックスがメモリに収まる大きさ(一般的な選び方。収まらないとディスクの遅さが事例5に混ざる)。microでは表だけで`shared_buffers`に収まらなかった。パスワードが状態ファイルに入らない。AZをまたぐ1ms前後の遅れを検索の時間に混ぜない |
+| pgvectorの測定の条件 | 1024次元×10万件(合成ベクトル、seedは0)。HNSWのパラメータはpgvectorの初期値(`m=16`・`ef_construction=64`・`ef_search=40`)。質問100個、top-5。時間は`EXPLAIN (ANALYZE, TIMING OFF)`のDBの中の実行時間で、1周温めてから測る | 条件は結果を見る前に、現実の値から決めた(差が出るように逆算しない)。1024はTitan Text Embeddings V2の初期値・bge-m3・multilingual-e5-largeの次元。10万件は中規模の社内文書(5,000件×20チャンク程度)。top-5はMCPサーバの初期値。手元のfaiss(128次元×50万件)は遅さを見せるための逆算で、手元の確認用に残す |
 | エージェントの基本形 | 1回の応答で頼まれたツール呼び出しは`asyncio.gather`で同時に実行し、MCPの接続とツールの一覧は使い回す。システムプロンプトは付けない。LLMを呼ぶのは1回の質問につき最大10回 | 事例の「直した書き方」の基準。10はOpenAI Agents SDKの`DEFAULT_MAX_TURNS`(LangChainは15、smolagentsは20)。日付をシステムプロンプトに入れる話は#10の事例で扱う |
 | LLMへのリクエスト | ストリーミングで受け、temperatureは0にする。`max_tokens`は付けない | ストリーミング: TTFTはllama.cpp以外のサーバでも測れ、チャットの体感の速さを決め、llama.cppの読み込み時間との差で通信などの分が分かる。temperature: llama.cppの初期値0.8では、同じ質問でツール呼び出しの数が2つになったり4つになったりした。`max_tokens`: 主なフレームワークは初期値で付けない。止まらない生成(§7の9)は#9の材料なので、基準の側で隠さない |
 | LLMの動かし方とモデルの大きさ | 事例の再現はGPUの8Bで行う。モデルの大きさは比べない | 手元のCPUで2Bを動かすと、1問18〜63秒のほとんどをLLMが占め、ツールの実行は1回1秒未満だった(§8)。事例の差(数十ミリ秒〜数秒)がLLMの時間に埋もれ、どの遅れが体感に効くかの比率が実際のサービス(GPUで推論)と大きく違う。答えの正しさは目的の外のまま。2026-10-11に「2Bのまま」と決めたが、この点を見落としていたため改めた |
@@ -153,9 +154,8 @@
 - [ ] 4. Terraform: VPC・RDS(pgvector)・AgentCore・CloudWatch。データ投入と、pgvectorの検索の計測
   - [x] 土台: 状態ファイルの置き場所(既存のバケット、別キー。バケット名は`infra/backend.hcl`に分けてコミットしない)、
     VPC・プライベートサブネット2つ(AZ IDで`apne1-az1`・`az2`)・S3のgatewayエンドポイント。作って消せることを確かめた(2026-10-12)
-  - [ ] RDS(pgvector): つなぎ方(§1)を決め、RDSを作って手元からつなぎ、`CREATE EXTENSION vector`まで確かめて消した(2026-10-25)。
-    次は合成ベクトルの投入と、HNSWの有無での測定。件数はその段で決める(50万件はfaissで遅さを見せるために逆算した値で、
-    db.t4g.microでは表だけで`shared_buffers`に収まらない)
+  - [x] RDS(pgvector): つなぎ方(§1)を決め、手元からつながることを確かめた(2026-10-25)。合成ベクトルを入れ、
+    HNSWの有無で検索を測った(2026-10-26。`scripts/load_pgvector.py`・`scripts/measure_pgvector.py`、結果は§8)
 - [ ] 5. MCPサーバをAgentCoreに預け、トレースをCloudWatchに集める
   (エージェントと2Bは手元のまま。つながることと、spanが1本のトレースになることを確かめる)
 - [ ] 5b. `toolcall-serving-bench`を終えた後で、GPUのEC2(推論サーバ＋Qwen3-8B)を同じVPCに置き、エージェントを
@@ -213,7 +213,10 @@
 ## 8. 実測済みの前提値
 
 - PCメモリ総量 13.74GB。大きな配列を作る前に空きを確認する
-- 手元のfaissでの検索の実測値はREADMEの「検索についての実測メモ」
+- 手元のfaiss(2026-10-04以前、Windows側。手元で動かすための代わりの部品で、事例の値ではない): `hnswlib`は
+  Python 3.13/Windowsでprebuilt wheelが無かったため`faiss`を使った。全件走査はコーパスの大きさにほぼ比例
+  (約8MBで1ms)。128次元×50万件・1回の検索でサブクエリ25回は、遅さが見えるよう逆算した値。HNSWの
+  `efSearch`がfaissの既定値16だと、約1%のクエリでrecallが0になった(64で解消)
 - venv: WSLの`~/.venvs/agent-latency-tracer`(Python 3.14.4、faiss 1.15.1。2026-10-06作成、全テスト通過)。
   Windows側の`.venv/Scripts/python.exe`(3.13)はfaissが読み込めないため、faissを使わない作業にだけ使える
 - 2026-10-06時点で、このPCではWindowsのスマートアプリコントロールがfaissのDLLの読み込みを止める。faissを読み込む
@@ -238,3 +241,9 @@
 - Terraform(土台＋踏み台＋SSMのエンドポイント＋RDS、23個): applyは約7分(RDSが5分42秒)、destroyは約4分(インターフェース型
   エンドポイントの削除が約3分)
 - SSMのトンネル: `start-session`を始めてから手元のポートが開くまで約1分。開く前につなぐと失敗する
+- **pgvectorの検索(2026-10-26、db.t4g.medium、PostgreSQL 18.3・pgvector 0.8.1、1024次元×10万件、§1の条件)**:
+  - HNSWなし(Seq Scan): 中央値488ms、p95 625ms。HNSWあり(Index Scan): 中央値1.0ms、p95 1.5ms
+  - recall@5は0.882(`ef_search`は初期値の40のまま。全件走査の結果を正解とした)
+  - HNSWを作るのに87秒(`maintenance_work_mem`はその接続だけ1GB)、インデックスは781MB(見込みの約2倍)。表は533MB
+  - 両方ともディスクからの読み込みは0で、メモリに収まっていた。`shared_buffers`約910MB、`effective_cache_size`約1.8GB
+  - 投入はトンネル越しに600秒(約0.9MB/秒)。apply約6分、destroy約6分(インターフェース型エンドポイントの削除が約5分)
