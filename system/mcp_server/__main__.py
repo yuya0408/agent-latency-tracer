@@ -4,6 +4,7 @@ Environment variables:
   MCP_SERVER_OTEL  "0" turns server-side spans off (default "1")
   TRACE_DB         SQLite file the server's spans go to (default "traces.db")
   CORPUS_N         retrieval corpus size (default system.mcp_server.server.DEFAULT_CORPUS_N)
+  MCP_SERVER_HOST  address to listen on (default "127.0.0.1"; the container sets "0.0.0.0")
 """
 from __future__ import annotations
 import os
@@ -16,8 +17,8 @@ from system.mcp_server.server import DEFAULT_CORPUS_N, build_server
 from tracing.exporter import SQLiteSpanExporter
 from tracing.instrumentation import build_tracer_provider
 
-HOST = "127.0.0.1"
-PORT = 8000
+HOST = os.environ.get("MCP_SERVER_HOST", "127.0.0.1")
+PORT = 8000  # AgentCore Runtime expects MCP servers on 8000, path /mcp
 
 
 def main() -> None:
@@ -29,7 +30,9 @@ def main() -> None:
         provider = build_tracer_provider(exporter, service_name="mcp-server", batch=True)
         trace.set_tracer_provider(provider)
     server = build_server(otel=otel, corpus_n=int(os.environ.get("CORPUS_N", DEFAULT_CORPUS_N)))
-    app = server.streamable_http_app(host=HOST)
+    # Stateless, as AgentCore Runtime recommends: no per-session state kept in
+    # the server, so any request can go to any instance.
+    app = server.streamable_http_app(host=HOST, stateless_http=True)
     if otel:
         # One span per HTTP request, from receiving it to finishing the response.
         # The per-message receive/send child spans are left out: each span costs
