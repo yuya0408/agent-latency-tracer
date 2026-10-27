@@ -4,13 +4,16 @@ LLM and MCP server, and write a waterfall HTML for each run.
   terminal 1:  python -m system.mcp_server
   terminal 2:  python scripts/run_agent.py          # all questions
                python scripts/run_agent.py 2 3      # only questions 2 and 3
+               python scripts/run_agent.py --cloudwatch 1   # also send the agent's spans to CloudWatch
 
 llama.cpp must be serving on 127.0.0.1:8080 (docs/DESIGN.md §8). Both
 processes write spans to the same SQLite file (TRACE_DB, default
 "traces.db"), so the server's spans land in the same trace as the agent's.
+--cloudwatch needs the "aws" extra and AWS credentials, and Transaction
+Search on in the account (infra/account/). Only the agent's spans go there.
 """
 from __future__ import annotations
-import asyncio, json, os, sys, time
+import argparse, asyncio, json, os, sys, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -51,9 +54,14 @@ def _tool_calls(messages: list[dict]) -> list[str]:
     ]
 
 
-async def main(numbers: list[int]) -> None:
+async def main(numbers: list[int], cloudwatch: bool) -> None:
     db_path = os.environ.get("TRACE_DB", "traces.db")
-    provider = build_tracer_provider(SQLiteSpanExporter(db_path), service_name="agent", batch=True)
+    exporters = [SQLiteSpanExporter(db_path)]
+    if cloudwatch:
+        # Imported here so the script runs without the "aws" extra.
+        from tracing.aws_exporter import cloudwatch_span_exporter
+        exporters.append(cloudwatch_span_exporter())
+    provider = build_tracer_provider(*exporters, service_name="agent", batch=True)
     set_global_tracer_provider(provider)
     tracer = get_tracer(provider)
 
@@ -81,10 +89,13 @@ async def main(numbers: list[int]) -> None:
     for n, trace_id in trace_ids.items():
         path = OUT_DIR / f"run_agent_q{n}.html"
         path.write_text(render_trace_html(db_path, trace_id), encoding="utf-8")
-        print(f"Q{n}: {path}")
+        print(f"Q{n}: {path}  (trace {trace_id})")
     provider.shutdown()
 
 
 if __name__ == "__main__":
-    numbers = [int(a) for a in sys.argv[1:]] or list(range(1, len(QUESTIONS) + 1))
-    asyncio.run(main(numbers))
+    parser = argparse.ArgumentParser(description="Run the provisional questions and write a waterfall for each.")
+    parser.add_argument("numbers", nargs="*", type=int, help="question numbers (default: all)")
+    parser.add_argument("--cloudwatch", action="store_true", help="also send the agent's spans to CloudWatch")
+    args = parser.parse_args()
+    asyncio.run(main(args.numbers or list(range(1, len(QUESTIONS) + 1)), args.cloudwatch))
