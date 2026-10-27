@@ -16,6 +16,8 @@
 | MCPのSDKとプロトコルの版 | 公式Python SDK `mcp==2.3.0`(低レベルAPI)。プロトコルはSDKの初期設定のまま(2026-07-28版。相手が古い版なら自動で切り替わる) | 新しく作るなら何も指定しない状態が自然。古い版に固定する理由(「今は古い版が多い」)は推測にすぎなかった |
 | LLM | 段階5までは手元のllama.cpp(公式Dockerイメージ`ghcr.io/ggml-org/llama.cpp:server`、b11434)で、Qwen3.5-2B(Q4_K_M、1.28GB)。段階5b以降は、`toolcall-serving-bench`で組んだGPUのEC2(g6.xlarge、NVIDIA L4)で、Qwen3-8B。エンジンは、その時点の`toolcall-serving-bench`の結果を見て決める。どちらもthinkingはオフ | 段階5までは、つながることを確かめるだけでLLMの性能は効かないので、費用のかからない手元で進める。事例の再現(段階6)では、LLMが時間の大半を占めないGPUにする(「LLMの動かし方とモデルの大きさ」)。偽LLMは自動テストの中だけで使う |
 | トレースの集め先 | CloudWatch(Transaction Search) | AgentCoreの基盤側のspanと同じ場所に集める。実務で標準的なやり方 |
+| Transaction Searchの設定 | `infra/account/`(状態ファイルは別のキー)で有効にし、段階ごとに消す`infra/`とは分けて残す。送り先はCloudWatch Logs、索引は初期値の1% | アカウントとリージョンに1つの設定。Terraformの説明では、送り先と索引のリソースを消してもAWS側の設定は戻らず、X-Rayに書き込みを許すログのリソースポリシーだけが消えて壊れる。spanを送らなければ費用はかからない。索引の割合は段階5で決める(§5) |
+| 手元からCloudWatchへの送信 | ADOTを使わず、OTel標準のOTLP/HTTPの送信部品に、botocoreでSigV4の署名をする`requests`のセッションを渡す(ADOTの`OTLPAwsSpanExporter`と同じ作り)。SQLiteへの保存は残し、CloudWatchは2つ目の送り先にする(`run_agent.py --cloudwatch`) | ADOTはOTelのSDKを1つの版に固定し、約50個の計装を一緒に入れ、TracerProviderを自分で組む前提で、このプロジェクトの`build_tracer_provider`と合わない。段階5のコンテナ(AgentCoreの公式の手順はADOTが前提)では見直す。SQLiteを残すのは「手元での開発」と同じ理由 |
 | 手元での開発 | AWS無しでも動く形を残す(検索はfaiss、トレースは自作SQLite＋waterfall) | 開発中の確認と、AWSを使わない読み手のため |
 | 事例の書き方 | 事例ごとに1ファイル。落とし穴ありと修正済みを並べる | 落とし穴のコードそのものが読めるようにする |
 | 公開する根拠 | トレースをJSONで書き出し、waterfall画像と一緒に`traces/`に置く。アカウントID・ARNは伏せる | 読み手がAWS無しで結果を確かめられるようにする |
@@ -51,8 +53,9 @@
 
 | 場所 | 役割 | 状態 |
 |---|---|---|
-| [tracing/instrumentation.py](../tracing/instrumentation.py) | OTel GenAI規約・MCP規約のspan builder、グローバルProviderの登録。保存は`batch=True`で`BatchSpanProcessor`(テストは`SimpleSpanProcessor`) | ✅ |
+| [tracing/instrumentation.py](../tracing/instrumentation.py) | OTel GenAI規約・MCP規約のspan builder、グローバルProviderの登録。保存は`batch=True`で`BatchSpanProcessor`(テストは`SimpleSpanProcessor`)。送り先は複数渡せ、それぞれに別のprocessorを付ける | ✅ |
 | [tracing/exporter.py](../tracing/exporter.py) | spanをSQLiteに保存(手元用) | ✅ |
+| [tracing/aws_exporter.py](../tracing/aws_exporter.py) | spanをCloudWatch(Transaction Search)に送る。OTLP/HTTPとSigV4(依存は`aws`の組) | ✅ |
 | [tracing/viewer/waterfall.py](../tracing/viewer/waterfall.py) | 単一HTMLのwaterfall(手元用) | ✅ |
 | [system/tools/](../system/tools/) | 業務ツール4つの定義(`catalog.json`)、データの種類と項目(`data_schema.json`)、合成データ(`mock_data.json`)、モック実行(200〜800ms待ってから、合成データを条件で絞り・集計して返す) | ✅ |
 | [system/retrieval/](../system/retrieval/) | 手元用の検索(faiss)、合成ベクトルの生成 | ✅(合成ベクトルはpgvectorへの投入にも使う) |
@@ -107,7 +110,18 @@
 - VPCモードのとき、コンテナからCloudWatchにトレースを送る経路(2026-10-26に方針を決めた): `xray`のインターフェース型
   エンドポイントを置く(NATは置かない)。実際に届くかは段階5で確かめる
 - AgentCore Runtimeの課金(待機中にも費用がかかるか)
-- 手元からCloudWatchにOTLPで送るときの受付口の仕様と署名の方法
+- 手元からCloudWatchにOTLPで送るときの受付口の仕様と署名の方法(2026-10-26に解決): 受付口は
+  `https://xray.<リージョン>.amazonaws.com/v1/traces`で、OTLP/HTTP(protobuf)だけを受け、gRPCは受けない。署名はSigV4で、
+  サービス名は`xray`。Transaction Searchが有効でないと受け付けない
+- **AgentCore Observability**(段階5): 中身はCloudWatchで、Transaction Searchが前提(4-4がその準備にあたる)。新しいRuntimeは、
+  spanをエージェントごとのロググループに置くのが初期値で、そのためには実行ロールに`logs:PutResourcePolicy`が要る(4-3で外した)。
+  権限を戻すか、`UNIFIED_TRACES_DESTINATION_ENABLED=false`でaws/spansに寄せるかを決める。公式の手順はADOT 0.18以上と
+  `opentelemetry-instrument`が前提(外すなら`DISABLE_ADOT_OBSERVABILITY=true`)
+- **AWSの画面でトレースを見る方法**(段階5で決める): aws/spansにはspanがすべて残り、Logs Insightsで`traceId`を指定すれば
+  集められる。一方、画面のトレースの詳細(waterfall)とトレースの一覧は、索引(トレースの要約)に入ったトレースだけを表示する。
+  初期値の1%では、手元から流す少ないトレースはまず表示されない(2026-10-27、`batch-get-traces`で0件)。サーバ側のspanが
+  手元のSQLiteに届かなくなる段階5で、索引の割合を上げて画面を使うか、自作のwaterfallにaws/spansから読む機能を足すかを
+  一緒に決める。1%を超える分は、索引に入れたspanの数で課金される
 - RDSで使えるpgvectorのバージョン(2026-10-25に解決): 東京のRDS for PostgreSQL 18系では0.8.1(18.1〜18.3)・
   0.8.2(18.4以降)。初期設定の18.3では0.8.1だった(§8)
 - この PC の CPU で llama.cpp の小さいモデルがどれくらいの速さで動くか(ツール定義入りのプロンプトで)
@@ -153,13 +167,16 @@
   - 動作確認用の仮の質問(事例ごとの質問は§6の6で決める。評価用に固定するものではない):
     1. A社の未出荷の受注は? 2. A社の未出荷の受注と、品目X001の在庫は? 3. 2026年9月の、取引先ごとの受注金額の合計は?
     4. B社からの仕入請求で、支払期日が10月中のものは? 5. 品目X001の入荷待ちの発注は? 6. 出張旅費の精算のルールは?
-- [ ] 4. Terraform: VPC・RDS(pgvector)・AgentCore・CloudWatch。データ投入と、pgvectorの検索の計測
+- [x] 4. Terraform: VPC・RDS(pgvector)・AgentCore・CloudWatch。データ投入と、pgvectorの検索の計測
   - [x] 土台: 状態ファイルの置き場所(既存のバケット、別キー。バケット名は`infra/backend.hcl`に分けてコミットしない)、
     VPC・プライベートサブネット2つ(AZ IDで`apne1-az1`・`az2`)・S3のgatewayエンドポイント。作って消せることを確かめた(2026-10-12)
   - [x] RDS(pgvector): つなぎ方(§1)を決め、手元からつながることを確かめた(2026-10-25)。合成ベクトルを入れ、
     HNSWの有無で検索を測った(2026-10-26。`scripts/load_pgvector.py`・`scripts/measure_pgvector.py`、結果は§8)
   - [x] AgentCoreの受け皿: ECRのリポジトリ、実行ロール、Runtime用のセキュリティグループ(RDSへの許可も)、
     インターフェース型エンドポイント4つ。作って消せることを確かめた(2026-10-26)。Runtime本体は段階5で作る
+  - [x] CloudWatch: Transaction Searchを`infra/account/`で有効にし(2026-10-26)、手元のエージェントのspanを送る
+    `tracing/aws_exporter.py`を足した。仮の質問1つで、エージェント側のspan 9本がaws/spansに1本のトレースとして、
+    親子関係を保ったまま届いた(2026-10-27。サーバ側のspanは手元のSQLiteだけ。§5の「AWSの画面でトレースを見る方法」)
 - [ ] 5. MCPサーバをAgentCoreに預け、トレースをCloudWatchに集める
   (エージェントと2Bは手元のまま。つながることと、spanが1本のトレースになることを確かめる)
 - [ ] 5b. `toolcall-serving-bench`を終えた後で、GPUのEC2(推論サーバ＋Qwen3-8B)を同じVPCに置き、エージェントを
@@ -213,6 +230,10 @@
 10. **TTFTとllama.cppの読み込み時間に差がある。** ツールを呼んだ1回目の呼び出しでは約600ms、答えを返す呼び出しでは
     50〜100ms。ツール呼び出しの書き出し部分の生成がTTFTに混ざると推測しているが、ツールを呼んで差が155msの回もあり、
     確かめていない
+11. **CloudWatchへの同期の送信は、中身の無い親spanを537msにした。** 試しのスクリプトで、親spanの中で子spanを1本作って
+    閉じただけで、`SimpleSpanProcessor`では親が537msになった。子spanが終わるたびに、署名とHTTPSの送信を呼び出し元で
+    待つため。2(SQLiteの約67ms)と同じ形で、1桁大きい。`batch=True`では起きない。手元からAWSまでの往復が含まれるので、
+    同じリージョンの中から送れば小さくなると推測しているが、確かめていない
 
 ## 8. 実測済みの前提値
 
@@ -227,6 +248,8 @@
   テスト(`test_retrieval.py`・`test_mcp.py`)とMCPサーバは、Windows側では動かない(10-04までは動いていた)。対処は手元の
   実行環境をWSLに移すこと(§1)。2aのSQLiteの値・READMEのfaissの実測値はWindows側での値
 - WSL2が使えるメモリは初期設定で約6GB(PCの半分)
+- llama.cppのコンテナは、モデルをWSLのUbuntuのホーム(`/home/<ユーザー>/models`)からマウントする。Ubuntuが起動する前に
+  Docker Desktopを起動してコンテナを動かすと、モデルのファイルが見つからずに終了した。Ubuntuを起動してから動かし直すと読み込めた
 - **llama.cpp(Qwen3.5-2B、CPU 4スレッド、2026-10-07)**:
   - 5ツールの定義は約1360トークン(質問だけなら21)
   - prefill(プレフィックスキャッシュをオフにして測定)は毎秒約55トークンで、長さにほぼ比例: 1381トークンで24秒、2732で48秒、
