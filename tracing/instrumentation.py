@@ -70,26 +70,34 @@ BATCH_EXPORT_INTERVAL_MS = 500
 
 
 def build_tracer_provider(
-    exporter: SpanExporter, *, service_name: str = "agent-latency-tracer", batch: bool = False
+    *exporters: SpanExporter, service_name: str = "agent-latency-tracer", batch: bool = False
 ) -> TracerProvider:
-    """Wire a single exporter to a new provider.
+    """Wire one or more exporters to a new provider, each behind its own processor.
+
+    One processor per exporter, so a slow destination (CloudWatch: signing and
+    an HTTPS round trip per batch) doesn't hold up the others; with batch=True
+    each has its own worker thread and queue.
 
     batch=False (SimpleSpanProcessor): each span is exported synchronously the
     moment it ends, on the calling thread. Deterministic, so tests use it --
     but the write blocks the event loop, and a SQLite commit after an idle
     gap took ~67ms on this PC, which delayed every tool response by that much
-    (docs/DESIGN.md §7).
+    (docs/DESIGN.md §7). With CloudWatch it is worse: every span waits for its
+    own signed HTTPS request.
 
     batch=True (BatchSpanProcessor): ending a span only queues it; a worker
     thread exports queued spans every BATCH_EXPORT_INTERVAL_MS. Use this
     in anything whose latency is being observed. Spans still queued when the
     process exits are lost unless provider.shutdown() (or force_flush()) runs.
     """
+    if not exporters:
+        raise ValueError("at least one exporter is required")
     provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
-    if batch:
-        provider.add_span_processor(BatchSpanProcessor(exporter, schedule_delay_millis=BATCH_EXPORT_INTERVAL_MS))
-    else:
-        provider.add_span_processor(SimpleSpanProcessor(exporter))
+    for exporter in exporters:
+        if batch:
+            provider.add_span_processor(BatchSpanProcessor(exporter, schedule_delay_millis=BATCH_EXPORT_INTERVAL_MS))
+        else:
+            provider.add_span_processor(SimpleSpanProcessor(exporter))
     return provider
 
 
