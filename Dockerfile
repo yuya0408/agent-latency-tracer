@@ -10,6 +10,7 @@ COPY tracing/ tracing/
 # rds: pgvector search (stage 5). aws: sending spans to CloudWatch.
 RUN pip install --no-cache-dir ".[rds,aws]"
 
-ENV MCP_SERVER_HOST=0.0.0.0
+ENV MCP_SERVER_HOST=0.0.0.0 \
+    TRACE_TO=cloudwatch
 EXPOSE 8000
 CMD ["python", "-m", "system.mcp_server"]
