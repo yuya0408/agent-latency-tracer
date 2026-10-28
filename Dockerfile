@@ -9,6 +9,8 @@ COPY system/ system/
 COPY tracing/ tracing/
 # rds: pgvector search (stage 5). aws: sending spans to CloudWatch.
 RUN pip install --no-cache-dir ".[rds,aws]"
+# RDS's CA certificates, for PGSSLMODE=verify-full.
+ADD https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /app/rds-ca.pem
 
 ENV MCP_SERVER_HOST=0.0.0.0 \
     TRACE_TO=cloudwatch

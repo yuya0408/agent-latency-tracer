@@ -37,6 +37,16 @@ resource "aws_bedrockagentcore_agent_runtime" "mcp_server" {
     # The runtime otherwise sets OTEL_* variables for ADOT, which the stock
     # OTLP exporter would also read (e.g. headers that redirect the spans).
     DISABLE_ADOT_OBSERVABILITY = "true"
+
+    RETRIEVAL_BACKEND = "pgvector"
+    PGHOST            = aws_db_instance.main.address
+    PGPORT            = tostring(aws_db_instance.main.port)
+    PGDATABASE        = aws_db_instance.main.db_name
+    PGUSER            = local.mcp_server_db_user
+    RDS_IAM_AUTH      = "1"
+    # Check the server's certificate against the RDS CA bundle in the image.
+    PGSSLMODE     = "verify-full"
+    PGSSLROOTCERT = "/app/rds-ca.pem"
   }
 
   # Headers the runtime passes through to the container. The docs don't say
@@ -45,8 +55,9 @@ resource "aws_bedrockagentcore_agent_runtime" "mcp_server" {
     request_header_allowlist = ["traceparent", "tracestate"]
   }
 
-  # The role's policy has to exist before the runtime pulls the image.
-  depends_on = [aws_iam_role_policy.agentcore_runtime]
+  # The role's policies have to exist before the runtime pulls the image
+  # and the server logs in to RDS.
+  depends_on = [aws_iam_role_policy.agentcore_runtime, aws_iam_role_policy.agentcore_runtime_rds]
 }
 
 # Turning on the runtime's tracing (the console's "Tracing" switch): its

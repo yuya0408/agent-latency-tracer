@@ -8,6 +8,7 @@ Environment variables:
   CORPUS_N         retrieval corpus size (default system.mcp_server.server.DEFAULT_CORPUS_N)
   MCP_SERVER_HOST  address to listen on (default "127.0.0.1"; the container sets "0.0.0.0")
   RETRIEVAL_BACKEND  "faiss" (default) or "pgvector"; pgvector reads PGHOST, PGUSER, ... like libpq
+  RDS_IAM_AUTH     "1": log in to RDS with an IAM token instead of PGPASSWORD (needs the "aws" extra)
 """
 from __future__ import annotations
 import os

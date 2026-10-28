@@ -13,7 +13,7 @@ Retrieval runs on faiss in-process (local development) or on PostgreSQL +
 pgvector (`retrieval="pgvector"`; RDS on AWS).
 """
 from __future__ import annotations
-import json, zlib
+import json, os, zlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -92,9 +92,20 @@ class _Retriever:
         return search(self._index, np.ascontiguousarray(vector), top_k)
 
 
+def _rds_iam_token() -> dict[str, str]:
+    """A fresh IAM auth token as the password. Valid 15 minutes, and signed
+    locally (no request to AWS), so making one per new connection is cheap."""
+    import botocore.session  # needs the "aws" extra
+
+    host, port, user = os.environ["PGHOST"], int(os.environ.get("PGPORT", "5432")), os.environ["PGUSER"]
+    rds = botocore.session.get_session().create_client("rds")
+    return {"password": rds.generate_db_auth_token(DBHostname=host, Port=port, DBUsername=user)}
+
+
 class _PgvectorRetriever:
     """Same idea as _Retriever, with the search in PostgreSQL. Connection
-    settings come from the libpq environment variables (PGHOST, PGUSER, ...).
+    settings come from the libpq environment variables (PGHOST, PGUSER, ...);
+    with RDS_IAM_AUTH=1 the password is an IAM token made per connection.
 
     The pool is opened once per process in the server's lifespan and reached
     through ctx.lifespan_context. Async, so a search doesn't hold up the
@@ -110,7 +121,9 @@ class _PgvectorRetriever:
         from pgvector.psycopg import register_vector_async
         from psycopg_pool import AsyncConnectionPool
 
-        async with AsyncConnectionPool("", configure=register_vector_async) as pool:
+        # The pool calls kwargs for every new connection, so tokens don't expire on it.
+        kwargs = _rds_iam_token if os.environ.get("RDS_IAM_AUTH") == "1" else None
+        async with AsyncConnectionPool("", kwargs=kwargs, configure=register_vector_async) as pool:
             yield {"pool": pool}
 
     async def retrieve(self, ctx: ServerRequestContext, query: str, top_k: int) -> list[int]:

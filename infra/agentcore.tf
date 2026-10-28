@@ -8,6 +8,8 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
   # Runtime names allow letters, digits and underscores only.
   runtime_prefix = "agent_latency_tracer"
+  # Created in the database by scripts/create_mcp_server_user.sql.
+  mcp_server_db_user = "mcp_server"
 }
 
 resource "aws_ecr_repository" "mcp_server" {
@@ -93,6 +95,19 @@ resource "aws_iam_role_policy" "agentcore_runtime" {
         ]
       },
     ]
+  })
+}
+
+# Logging in to RDS as the MCP server's DB user, with an IAM token.
+resource "aws_iam_role_policy" "agentcore_runtime_rds" {
+  role = aws_iam_role.agentcore_runtime.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "rds-db:connect"
+      Resource = "arn:aws:rds-db:${var.region}:${local.account_id}:dbuser:${aws_db_instance.main.resource_id}/${local.mcp_server_db_user}"
+    }]
   })
 }
 
