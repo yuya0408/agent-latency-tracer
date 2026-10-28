@@ -10,10 +10,16 @@ Over HTTP it also writes traceparent into each request's HTTP headers, so
 HTTP-level spans on the server side (ASGI middleware) join the same trace.
 The SDK only puts it in params._meta, which HTTP-level code never reads.
 
+A server on AgentCore Runtime (a bedrock-agentcore.<region>.amazonaws.com
+URL) takes only SigV4-signed requests; those are signed with the local AWS
+credentials (needs the "aws" extra).
+
 One instance = one connection, reused for every call inside `async with`.
 """
 from __future__ import annotations
+from collections.abc import AsyncGenerator
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx2
 from mcp import Client, types
@@ -34,6 +40,55 @@ async def _inject_traceparent(request: httpx2.Request) -> None:
     propagate.inject(request.headers)
 
 
+_AGENTCORE_HOST_PREFIX = "bedrock-agentcore."
+
+
+class _SigV4Auth(httpx2.Auth):
+    """Signs each request for AgentCore Runtime (signing name bedrock-agentcore).
+
+    Only the host and the body are signed. Headers added after signing (the
+    traceparent hook runs later) are sent unsigned, which SigV4 allows."""
+
+    requires_request_body = True
+
+    def __init__(self, region: str) -> None:
+        import botocore.session  # needs the "aws" extra
+
+        self._region = region
+        # botocore refreshes temporary credentials on access, so hold the object.
+        self._credentials = botocore.session.get_session().get_credentials()
+        if self._credentials is None:
+            raise RuntimeError("no AWS credentials found (aws configure, or AWS_PROFILE)")
+
+    async def async_auth_flow(self, request: httpx2.Request) -> AsyncGenerator[httpx2.Request, httpx2.Response]:
+        from botocore.auth import SigV4Auth
+        from botocore.awsrequest import AWSRequest
+
+        signed = AWSRequest(method=request.method, url=str(request.url), data=request.content)
+        SigV4Auth(self._credentials, "bedrock-agentcore", self._region).add_auth(signed)
+        request.headers.update(dict(signed.headers))
+        yield request
+
+
+class _SessionPin:
+    """Sends back the Mcp-Session-Id that AgentCore Runtime returns, so the
+    requests stay on one microVM; without it each one may land on a new one
+    and wait for its cold start (5-8s each when this was first measured).
+
+    The SDK only keeps a session id from an `initialize` response, and with
+    a server that answers `server/discover` it never sends `initialize`."""
+
+    def __init__(self) -> None:
+        self._session_id: str | None = None
+
+    async def on_request(self, request: httpx2.Request) -> None:
+        if self._session_id is not None and "mcp-session-id" not in request.headers:
+            request.headers["mcp-session-id"] = self._session_id
+
+    async def on_response(self, response: httpx2.Response) -> None:
+        self._session_id = response.headers.get("mcp-session-id", self._session_id)
+
+
 class McpToolClient:
     def __init__(self, server: str | Server, tracer: trace.Tracer, *, agent_name: str | None = None) -> None:
         """`server` is a URL (e.g. http://127.0.0.1:8000/mcp), or a Server object
@@ -43,6 +98,15 @@ class McpToolClient:
             # Same defaults (timeouts) the SDK would use, plus our request hook.
             self._http = create_mcp_http_client()
             self._http.event_hooks = {"request": [_inject_traceparent]}
+            host = urlsplit(server).hostname or ""
+            if host.startswith(_AGENTCORE_HOST_PREFIX):
+                # bedrock-agentcore.<region>.amazonaws.com
+                self._http.auth = _SigV4Auth(host.split(".")[1])
+                pin = _SessionPin()
+                self._http.event_hooks = {
+                    "request": [_inject_traceparent, pin.on_request],
+                    "response": [pin.on_response],
+                }
             self._client = Client(streamable_http_client(server, http_client=self._http))
         else:
             self._client = Client(server)

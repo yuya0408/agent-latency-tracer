@@ -24,7 +24,8 @@ from tracing.instrumentation import (
 )
 from tracing.viewer.waterfall import render_trace_html
 
-SERVER_URL = "http://127.0.0.1:8000/mcp"
+# MCP_SERVER_URL: e.g. the AgentCore URL from `terraform output mcp_server_url`
+SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://127.0.0.1:8000/mcp")
 OUT_DIR = Path("out")
 
 # Three independent lookups: none needs another's result, so they can run concurrently.
