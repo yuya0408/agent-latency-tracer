@@ -59,13 +59,13 @@
 | [tracing/viewer/waterfall.py](../tracing/viewer/waterfall.py) | 単一HTMLのwaterfall(手元用) | ✅ |
 | [system/tools/](../system/tools/) | 業務ツール4つの定義(`catalog.json`)、データの種類と項目(`data_schema.json`)、合成データ(`mock_data.json`)、モック実行(200〜800ms待ってから、合成データを条件で絞り・集計して返す) | ✅ |
 | [system/retrieval/](../system/retrieval/) | 手元用の検索(faiss)、合成ベクトルの生成 | ✅(合成ベクトルはpgvectorへの投入にも使う) |
-| [system/mcp_server/](../system/mcp_server/) | 自作MCPサーバ(低レベルAPI、Streamable HTTP、`127.0.0.1:8000/mcp`)。業務ツール＋文書検索`retrieve_documents`。計装オンのときはHTTPリクエストごとのspan(`opentelemetry-instrumentation-asgi`)も出す。`MCP_SERVER_OTEL=0`で計装オフ | ✅ |
-| [system/mcp_client.py](../system/mcp_client.py) | SDKの`Client`を包み、tool呼び出しを`execute_tool` spanで囲む。HTTPヘッダにも`traceparent`を載せる(`httpx2`の`event_hooks`。SigV4の署名もここに足す見込み)。`async with`の間は接続を使い回す | ✅ |
+| [system/mcp_server/](../system/mcp_server/) | 自作MCPサーバ(低レベルAPI、Streamable HTTP、`/mcp`、ステートレス)。業務ツール＋文書検索`retrieve_documents`(faissかpgvector。RDSにはIAMのトークンでログイン)。AgentCore用のコンテナは`Dockerfile`。計装オンのときはHTTPリクエストごとのspan(`opentelemetry-instrumentation-asgi`)も出す。`MCP_SERVER_OTEL=0`で計装オフ | ✅ |
+| [system/mcp_client.py](../system/mcp_client.py) | SDKの`Client`を包み、tool呼び出しを`execute_tool` spanで囲む。HTTPヘッダにも`traceparent`を載せる(`httpx2`の`event_hooks`)。AgentCoreのURLならSigV4で署名し、`Mcp-Session-Id`を送り返す(§7の12)。`async with`の間は接続を使い回す | ✅ |
 | [scripts/try_mcp.py](../scripts/try_mcp.py) | 手元の動作確認。ツール3つを「1つずつ」と「同時に」で呼び、waterfallを`out/`に出す | ✅ |
 | [scripts/run_agent.py](../scripts/run_agent.py) | 手元の動作確認。仮の質問(§6の3)をエージェントに流し、質問ごとのwaterfallを`out/`に出す | ✅ |
 | [system/llm/](../system/llm/) | OpenAI互換クライアント。ストリーミングで受け、chat spanにTTFTとllama.cppの内訳(`timings`)を記録する。断片で届くツール呼び出しを組み立てる | ✅ |
 | [system/agent.py](../system/agent.py) | エージェントループ(§1の「エージェントの基本形」) | ✅ |
-| `infra/` | Terraform(VPC・RDS・AgentCore・CloudWatchの設定) | ⬜ |
+| [infra/](../infra/) | Terraform(VPC・RDS・踏み台・AgentCore Runtime・基盤側のspanの配送)。`infra/account/`はTransaction Search | ✅ |
 | `docs/runbook.md`・`traces/` | 手順書と根拠のトレース | ⬜ |
 
 ## 4. span設計
@@ -106,17 +106,20 @@
 
 ## 5. 確認が必要なこと(作る段階で確かめる)
 
-- AgentCoreの`InvokeAgentRuntime` spanが、自分のspanと1本のトレースにつながるか
-- VPCモードのとき、コンテナからCloudWatchにトレースを送る経路(2026-10-26に方針を決めた): `xray`のインターフェース型
-  エンドポイントを置く(NATは置かない)。実際に届くかは段階5で確かめる
+- AgentCoreの基盤側のspanが、自分のspanと1本のトレースにつながるか(2026-10-28に解決): つながる。span名は
+  `AgentCore.Runtime.Invoke`(`aws.operation.name`が`InvokeAgentRuntime`、`latency_ms`・`session.id`付き)。
+  クライアントが送った`traceparent`を親にし、コンテナの`POST /mcp`はその子になる。Runtimeのトレースを有効にするのは、
+  CloudWatch Logsの配送(送り元`TRACES`、送り先`XRAY`)でTerraformから書けた(公式のSDKの例はmemoryとgatewayだけを挙げていた)。
+  ヘッダの許可リストには`traceparent`・`tracestate`を入れた(入れない場合に届くかは試していない)
+- VPCモードのとき、コンテナからCloudWatchにトレースを送る経路(2026-10-28に解決): `xray`のインターフェース型
+  エンドポイント経由で届いた(NATなし)。実行ロールに`xray:PutSpans`が要る
 - AgentCore Runtimeの課金(待機中にも費用がかかるか)
 - 手元からCloudWatchにOTLPで送るときの受付口の仕様と署名の方法(2026-10-26に解決): 受付口は
   `https://xray.<リージョン>.amazonaws.com/v1/traces`で、OTLP/HTTP(protobuf)だけを受け、gRPCは受けない。署名はSigV4で、
   サービス名は`xray`。Transaction Searchが有効でないと受け付けない
-- **AgentCore Observability**(段階5): 中身はCloudWatchで、Transaction Searchが前提(4-4がその準備にあたる)。新しいRuntimeは、
-  spanをエージェントごとのロググループに置くのが初期値で、そのためには実行ロールに`logs:PutResourcePolicy`が要る(4-3で外した)。
-  権限を戻すか、`UNIFIED_TRACES_DESTINATION_ENABLED=false`でaws/spansに寄せるかを決める。公式の手順はADOT 0.18以上と
-  `opentelemetry-instrument`が前提(外すなら`DISABLE_ADOT_OBSERVABILITY=true`)
+- **AgentCore Observability**(2026-10-28に解決): `UNIFIED_TRACES_DESTINATION_ENABLED=false`で基盤側のspanもaws/spansに寄せ、
+  `logs:PutResourcePolicy`は戻していない。ADOTは使わず、`DISABLE_ADOT_OBSERVABILITY=true`でRuntimeが入れる`OTEL_*`の
+  環境変数を消した(標準のOTLPエクスポーターがヘッダなどを環境変数からも読むため)
 - **AWSの画面でトレースを見る方法**(段階5で決める): aws/spansにはspanがすべて残り、Logs Insightsで`traceId`を指定すれば
   集められる。一方、画面のトレースの詳細(waterfall)とトレースの一覧は、索引(トレースの要約)に入ったトレースだけを表示する。
   初期値の1%では、手元から流す少ないトレースはまず表示されない(2026-10-27、`batch-get-traces`で0件)。サーバ側のspanが
@@ -125,11 +128,8 @@
 - RDSで使えるpgvectorのバージョン(2026-10-25に解決): 東京のRDS for PostgreSQL 18系では0.8.1(18.1〜18.3)・
   0.8.2(18.4以降)。初期設定の18.3では0.8.1だった(§8)
 - この PC の CPU で llama.cpp の小さいモデルがどれくらいの速さで動くか(ツール定義入りのプロンプトで)
-- **AgentCoreのセッションID**: AgentCoreはMCPの版に関係なく`Mcp-Session-Id`を付け、それで同じmicroVMに振り分ける。
-  付け直さないとリクエストごとに新しいmicroVMに行き、コールドスタートで遅くなりうる(公式の
-  MCP protocol contract)。2026-07-28版で話すとき、SDKのクライアントがこのIDを送り返すかは未確認
-- **AgentCoreに載せるときのサーバ設定**: AgentCoreは`stateless_http=True`を推奨。今はSDKの初期設定(False)なので、
-  載せるときに切り替える。ホストは`0.0.0.0`、ARM64のコンテナ
+- **AgentCoreのセッションID**(2026-10-28に解決): SDKのクライアントは送り返さなかった。自作のクライアントで送り返す(§7の12)
+- **AgentCoreに載せるときのサーバ設定**(2026-10-28に解決): `stateless_http=True`、ホストは`0.0.0.0`、ARM64のコンテナ
 - **ツールの結果に中身を持たせるか**(2026-10-08に解決): `{"status": "ok"}`だけを返すモックでは、LLMが作り話をしたり
   同じ呼び出しを繰り返したりした。0件と明示する・条件を無視した仮の行を返す・小さな合成データを条件で絞る、の3通りを
   試し、2段以上の質問が止まるのは最後だけだった。そこで、15種類それぞれ数件の合成データを持たせ、`filter`で絞って返す
@@ -177,8 +177,14 @@
   - [x] CloudWatch: Transaction Searchを`infra/account/`で有効にし(2026-10-26)、手元のエージェントのspanを送る
     `tracing/aws_exporter.py`を足した。仮の質問1つで、エージェント側のspan 9本がaws/spansに1本のトレースとして、
     親子関係を保ったまま届いた(2026-10-27。サーバ側のspanは手元のSQLiteだけ。§5の「AWSの画面でトレースを見る方法」)
-- [ ] 5. MCPサーバをAgentCoreに預け、トレースをCloudWatchに集める
+- [x] 5. MCPサーバをAgentCoreに預け、トレースをCloudWatchに集める
   (エージェントと2Bは手元のまま。つながることと、spanが1本のトレースになることを確かめる)
+  - [x] コンテナ(ARM64、`stateless_http`)、pgvectorでの検索(`RETRIEVAL_BACKEND`)、spanの送り先の切り替え(`TRACE_TO`)(2026-10-27)
+  - [x] Runtime本体・基盤側のspanの配送・SigV4で署名するクライアント(2026-10-28)。仮の質問2で、エージェント・基盤・
+    サーバのspanが1本のトレースとしてaws/spansに入った(エージェントの`MCP send`→`AgentCore.Runtime.Invoke`→`POST /mcp`)
+  - [x] 検索をRDSに切り替え(2026-10-28)。MCPサーバは専用のDBユーザー(`rds_iam`、`documents`の読み取りだけ)にIAMのトークンで
+    ログインし、SSLは`verify-full`。`SELECT documents`のspanが`tools/call retrieve_documents`の子として同じトレースに入った
+  - 残り: AWSの画面でトレースを見る方法(§5)は未決。今は`traceId`を指定してLogs Insightsで集めている
 - [ ] 5b. `toolcall-serving-bench`を終えた後で、GPUのEC2(推論サーバ＋Qwen3-8B)を同じVPCに置き、エージェントを
   AgentCore Runtimeに移す。GPUのTerraformは`toolcall-serving-bench`のものを元にする。同じAWSアカウントの
   月60ドルの予算を分け合うので、`toolcall-serving-bench`の実行と同じ月に回さない(g6.xlargeは1時間約$1.17)
@@ -234,6 +240,12 @@
     閉じただけで、`SimpleSpanProcessor`では親が537msになった。子spanが終わるたびに、署名とHTTPSの送信を呼び出し元で
     待つため。2(SQLiteの約67ms)と同じ形で、1桁大きい。`batch=True`では起きない。手元からAWSまでの往復が含まれるので、
     同じリージョンの中から送れば小さくなると推測しているが、確かめていない
+12. **AgentCore上のMCPサーバへのリクエストが、毎回コールドスタートしていた。** `try_mcp.py`が31秒かかり、基盤側のspanを
+    並べると、8回のリクエストがすべて別の`session.id`で、うち4回は`latency_ms`が5〜7秒だった(コンテナの`POST /mcp`は数ms)。
+    AgentCoreはレスポンスに`Mcp-Session-Id`を付け、それを送り返せば同じmicroVMに振り分ける。ところがSDKのクライアントは
+    `initialize`のレスポンスからしかIDを拾わず、`initialize`を使わない手順(`server/discover`)でつながると一度も送り返さない。
+    クライアントで送り返すようにすると、8回とも同じセッションになり、31秒が5.6秒、基盤側は24〜989msになった(2026-10-28)。
+    サーバ側の計装だけでは見えず、基盤側のspanの`session.id`と`latency_ms`を並べて初めて分かった
 
 ## 8. 実測済みの前提値
 
@@ -275,3 +287,17 @@
   - HNSWを作るのに87秒(`maintenance_work_mem`はその接続だけ1GB)、インデックスは781MB(見込みの約2倍)。表は533MB
   - 両方ともディスクからの読み込みは0で、メモリに収まっていた。`shared_buffers`約910MB、`effective_cache_size`約1.8GB
   - 投入はトンネル越しに600秒(約0.9MB/秒)。apply約6分、destroy約6分(インターフェース型エンドポイントの削除が約5分)
+- **AgentCore Runtime(2026-10-28)**:
+  - イメージ(ARM64、python:3.14-slim)は約121MB。手元(QEMUで代わりに実行)でのビルドとpushに6〜7分
+  - Runtimeの作成に4分48秒。作り直さなくても、環境変数を変えるとその場で更新される
+  - VPCモードでS3のゲートウェイ型エンドポイントからイメージを取るとき、RuntimeのSGにS3のプレフィックスリスト宛ての443番の
+    出口が要る(ゲートウェイ型はS3の公開IPのまま通る)。無いと、ログが1行も出ないまま、最初の呼び出しが
+    「Runtime initialization time exceeded(120秒)」で失敗した
+  - AgentCoreは定期的にコンテナへ死活確認を送り(HTTPの`GET /ping`と、MCPの`ping`)、そのspanもaws/spansに入る。
+    手元のtrace_idで絞らないと、自分のトレースが埋もれる
+  - 1回のツール呼び出し(仮の質問2): エージェントの`MCP send`約1.16秒、基盤側約0.86秒、サーバの`POST /mcp`約0.80秒
+    (ツールの中身はモックの待ち時間)。手元から東京リージョンまでの分が約0.3秒
+  - RDSへの検索(1,000件、HNSWなし): `SELECT documents`約8ms
+  - destroy: インターフェース型エンドポイントの削除がTerraformの待ち時間(10分)を超えてエラーになった(その後に消えた)。
+    また、Runtimeを消した後も、AgentCoreが作ったネットワークインターフェース(`agentic_ai`型)がRuntimeのSGをつかんだまま残り、
+    SG・サブネット・VPCを消せなかった。時間をおいてdestroyし直す
