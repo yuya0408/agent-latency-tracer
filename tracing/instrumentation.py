@@ -61,6 +61,15 @@ MCP_METHOD_NAME = "mcp.method.name"
 MCP_PROTOCOL_VERSION = "mcp.protocol.version"
 MCP_SESSION_ID = "mcp.session.id"
 
+# --- db.* / server.* attribute keys (OTel database semantic conventions) ----
+
+DB_SYSTEM_NAME = "db.system.name"
+DB_OPERATION_NAME = "db.operation.name"
+DB_COLLECTION_NAME = "db.collection.name"
+DB_QUERY_TEXT = "db.query.text"  # parameterized, so no values in it
+SERVER_ADDRESS = "server.address"
+SERVER_PORT = "server.port"
+
 _INSTRUMENTATION_SCOPE = "agent-latency-tracer"
 
 
@@ -177,6 +186,36 @@ def set_retrieval_results(
     if not capture_content:
         return
     span.set_attribute(RETRIEVAL_DOCUMENTS, json.dumps(list(documents)))
+
+
+@contextmanager
+def db_query_span(
+    tracer: trace.Tracer,
+    *,
+    system: str,
+    operation: str,
+    collection: str,
+    query_text: str | None = None,
+    server_address: str | None = None,
+    server_port: int | None = None,
+) -> Iterator[Span]:
+    """Span for one database query, named `{operation} {collection}` as the
+    database conventions suggest (e.g. "SELECT documents")."""
+    attributes: dict[str, Any] = {
+        DB_SYSTEM_NAME: system,
+        DB_OPERATION_NAME: operation,
+        DB_COLLECTION_NAME: collection,
+    }
+    if query_text is not None:
+        attributes[DB_QUERY_TEXT] = query_text
+    if server_address is not None:
+        attributes[SERVER_ADDRESS] = server_address
+    if server_port is not None:
+        attributes[SERVER_PORT] = server_port
+    with tracer.start_as_current_span(
+        f"{operation} {collection}", kind=SpanKind.CLIENT, attributes=attributes
+    ) as span:
+        yield span
 
 
 @contextmanager

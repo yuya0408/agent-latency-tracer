@@ -8,19 +8,26 @@ which business tool to call.
 Server-side OTel is the SDK's built-in OpenTelemetryMiddleware, which the
 low-level Server installs by default. `otel=False` removes it, standing in
 for an MCP server that was built elsewhere without instrumentation.
+
+Retrieval runs on faiss in-process (local development) or on PostgreSQL +
+pgvector (`retrieval="pgvector"`; RDS on AWS).
 """
 from __future__ import annotations
 import json, zlib
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 import numpy as np
 from mcp import types
 from mcp.server import Server, ServerRequestContext
+from opentelemetry import trace
 
 from system.retrieval.corpus import generate_corpus, generate_queries
 from system.retrieval.search import build_flat_index, search
 from system.tools.loader import load_catalog
 from system.tools.mock_server import call_tool as call_mock_tool
+from tracing.instrumentation import db_query_span
 
 SERVER_NAME = "agent-latency-tracer-tools"
 RETRIEVAL_TOOL = "retrieve_documents"
@@ -30,6 +37,15 @@ RETRIEVAL_TOOL = "retrieve_documents"
 DEFAULT_CORPUS_N = 10_000
 N_QUERY_VECTORS = 1_000
 DEFAULT_TOP_K = 5
+
+# What scripts/load_pgvector.py creates (same seed, so the query vectors
+# below land near the loaded documents).
+PGVECTOR_TABLE = "documents"
+PGVECTOR_DIM = 1024
+_PGVECTOR_SEARCH = f"SELECT id FROM {PGVECTOR_TABLE} ORDER BY embedding <-> %s LIMIT %s"
+
+# A proxy until a tracer provider is registered, so it can be made at import.
+_tracer = trace.get_tracer("agent-latency-tracer")
 
 
 def _business_tools() -> list[types.Tool]:
@@ -69,9 +85,44 @@ class _Retriever:
         self._index = build_flat_index(generate_corpus(n=corpus_n))
         self._queries = generate_queries(N_QUERY_VECTORS)
 
-    def retrieve(self, query: str, top_k: int) -> list[int]:
+    async def retrieve(self, ctx: ServerRequestContext, query: str, top_k: int) -> list[int]:
         vector = self._queries[zlib.crc32(query.encode("utf-8")) % N_QUERY_VECTORS]
+        # Synchronous faiss call inside the event loop: well under 1ms at
+        # the default corpus size, so it doesn't block anything noticeable.
         return search(self._index, np.ascontiguousarray(vector), top_k)
+
+
+class _PgvectorRetriever:
+    """Same idea as _Retriever, with the search in PostgreSQL. Connection
+    settings come from the libpq environment variables (PGHOST, PGUSER, ...).
+
+    The pool is opened once per process in the server's lifespan and reached
+    through ctx.lifespan_context. Async, so a search doesn't hold up the
+    event loop, and pooled, so concurrent tool calls don't queue on one
+    connection."""
+
+    def __init__(self) -> None:
+        self._queries = generate_queries(N_QUERY_VECTORS, dim=PGVECTOR_DIM)
+
+    @asynccontextmanager
+    async def lifespan(self, server: Server) -> AsyncIterator[dict[str, Any]]:
+        # Imported here: only the `rds` extra installs these.
+        from pgvector.psycopg import register_vector_async
+        from psycopg_pool import AsyncConnectionPool
+
+        async with AsyncConnectionPool("", configure=register_vector_async) as pool:
+            yield {"pool": pool}
+
+    async def retrieve(self, ctx: ServerRequestContext, query: str, top_k: int) -> list[int]:
+        vector = self._queries[zlib.crc32(query.encode("utf-8")) % N_QUERY_VECTORS]
+        async with ctx.lifespan_context["pool"].connection() as conn:
+            info = conn.info
+            with db_query_span(
+                _tracer, system="postgresql", operation="SELECT", collection=PGVECTOR_TABLE,
+                query_text=_PGVECTOR_SEARCH, server_address=info.host, server_port=info.port,
+            ):
+                cur = await conn.execute(_PGVECTOR_SEARCH, (vector, top_k))
+                return [row[0] for row in await cur.fetchall()]
 
 
 def _text_result(payload: Any, *, is_error: bool = False) -> types.CallToolResult:
@@ -81,10 +132,19 @@ def _text_result(payload: Any, *, is_error: bool = False) -> types.CallToolResul
     )
 
 
-def build_server(*, otel: bool = True, corpus_n: int = DEFAULT_CORPUS_N) -> Server:
+def build_server(
+    *, otel: bool = True, corpus_n: int = DEFAULT_CORPUS_N, retrieval: str = "faiss"
+) -> Server:
+    """`retrieval` is "faiss" (in-process, `corpus_n` documents) or "pgvector"
+    (whatever scripts/load_pgvector.py loaded; `corpus_n` is not used)."""
     tools = _business_tools()
     business_names = {t.name for t in tools}
-    retriever = _Retriever(corpus_n)
+    if retrieval == "faiss":
+        retriever: _Retriever | _PgvectorRetriever = _Retriever(corpus_n)
+    elif retrieval == "pgvector":
+        retriever = _PgvectorRetriever()
+    else:
+        raise ValueError(f"unknown retrieval backend: {retrieval}")
 
     async def on_list_tools(
         ctx: ServerRequestContext, params: types.PaginatedRequestParams | None
@@ -96,16 +156,17 @@ def build_server(*, otel: bool = True, corpus_n: int = DEFAULT_CORPUS_N) -> Serv
     ) -> types.CallToolResult:
         arguments = params.arguments or {}
         if params.name == RETRIEVAL_TOOL:
-            # Synchronous faiss call inside the event loop: well under 1ms at
-            # the default corpus size, so it doesn't block anything noticeable.
-            ids = retriever.retrieve(arguments["query"], arguments.get("top_k", DEFAULT_TOP_K))
+            ids = await retriever.retrieve(ctx, arguments["query"], arguments.get("top_k", DEFAULT_TOP_K))
             return _text_result({"document_ids": ids})
         if params.name in business_names:
             result = await call_mock_tool(params.name, arguments)
             return _text_result(result, is_error=result["status"] == "error")
         return _text_result({"error": f"unknown tool: {params.name}"}, is_error=True)
 
-    server = Server(SERVER_NAME, on_list_tools=on_list_tools, on_call_tool=on_call_tool)
+    extra: dict[str, Any] = {}
+    if isinstance(retriever, _PgvectorRetriever):
+        extra["lifespan"] = retriever.lifespan
+    server = Server(SERVER_NAME, on_list_tools=on_list_tools, on_call_tool=on_call_tool, **extra)
     if not otel:
         server.middleware = []
     return server

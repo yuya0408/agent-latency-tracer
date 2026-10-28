@@ -5,6 +5,7 @@ Environment variables:
   TRACE_DB         SQLite file the server's spans go to (default "traces.db")
   CORPUS_N         retrieval corpus size (default system.mcp_server.server.DEFAULT_CORPUS_N)
   MCP_SERVER_HOST  address to listen on (default "127.0.0.1"; the container sets "0.0.0.0")
+  RETRIEVAL_BACKEND  "faiss" (default) or "pgvector"; pgvector reads PGHOST, PGUSER, ... like libpq
 """
 from __future__ import annotations
 import os
@@ -29,7 +30,11 @@ def main() -> None:
         exporter = SQLiteSpanExporter(os.environ.get("TRACE_DB", "traces.db"))
         provider = build_tracer_provider(exporter, service_name="mcp-server", batch=True)
         trace.set_tracer_provider(provider)
-    server = build_server(otel=otel, corpus_n=int(os.environ.get("CORPUS_N", DEFAULT_CORPUS_N)))
+    server = build_server(
+        otel=otel,
+        corpus_n=int(os.environ.get("CORPUS_N", DEFAULT_CORPUS_N)),
+        retrieval=os.environ.get("RETRIEVAL_BACKEND", "faiss"),
+    )
     # Stateless, as AgentCore Runtime recommends: no per-session state kept in
     # the server, so any request can go to any instance.
     app = server.streamable_http_app(host=HOST, stateless_http=True)

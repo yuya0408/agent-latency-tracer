@@ -19,7 +19,7 @@ dev = [
     "pytest>=8.0",
 ]
 rds = [
-    "psycopg[binary]>=3.2",
+    "psycopg[binary,pool]>=3.2",
     "pgvector>=0.4",  # registers the vector type with psycopg (COPY in binary)
 ]
 aws = [
