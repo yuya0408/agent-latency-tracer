@@ -300,4 +300,5 @@
   - RDSへの検索(1,000件、HNSWなし): `SELECT documents`約8ms
   - destroy: インターフェース型エンドポイントの削除がTerraformの待ち時間(10分)を超えてエラーになった(その後に消えた)。
     また、Runtimeを消した後も、AgentCoreが作ったネットワークインターフェース(`agentic_ai`型)がRuntimeのSGをつかんだまま残り、
-    SG・サブネット・VPCを消せなかった。時間をおいてdestroyし直す
+    SG・サブネット・VPCを消せなかった。公式には、Runtimeを消した後もネットワークインターフェースが最大8時間残る。
+    時間をおいてdestroyし直す(どれも無料)
