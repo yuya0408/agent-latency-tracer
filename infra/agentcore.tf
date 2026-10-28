@@ -8,6 +8,8 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
   # Runtime names allow letters, digits and underscores only.
   runtime_prefix = "agent_latency_tracer"
+  # Created in the database by scripts/create_mcp_server_user.sql.
+  mcp_server_db_user = "mcp_server"
 }
 
 resource "aws_ecr_repository" "mcp_server" {
@@ -69,6 +71,12 @@ resource "aws_iam_role_policy" "agentcore_runtime" {
         Resource = "*"
       },
       {
+        # The server's own spans, sent over OTLP (tracing/aws_exporter.py).
+        Effect   = "Allow"
+        Action   = "xray:PutSpans"
+        Resource = "*"
+      },
+      {
         Effect    = "Allow"
         Action    = "cloudwatch:PutMetricData"
         Resource  = "*"
@@ -90,6 +98,19 @@ resource "aws_iam_role_policy" "agentcore_runtime" {
   })
 }
 
+# Logging in to RDS as the MCP server's DB user, with an IAM token.
+resource "aws_iam_role_policy" "agentcore_runtime_rds" {
+  role = aws_iam_role.agentcore_runtime.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "rds-db:connect"
+      Resource = "arn:aws:rds-db:${var.region}:${local.account_id}:dbuser:${aws_db_instance.main.resource_id}/${local.mcp_server_db_user}"
+    }]
+  })
+}
+
 resource "aws_security_group" "agentcore" {
   name   = "agent-latency-tracer-agentcore"
   vpc_id = aws_vpc.main.id
@@ -99,6 +120,16 @@ resource "aws_security_group" "agentcore" {
 resource "aws_vpc_security_group_egress_rule" "agentcore_https" {
   security_group_id = aws_security_group.agentcore.id
   cidr_ipv4         = var.vpc_cidr
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+}
+
+# Image layers come from S3 through the gateway endpoint, which keeps S3's
+# public addresses: the VPC CIDR rule above doesn't cover them.
+resource "aws_vpc_security_group_egress_rule" "agentcore_s3" {
+  security_group_id = aws_security_group.agentcore.id
+  prefix_list_id    = aws_vpc_endpoint.s3.prefix_list_id
   ip_protocol       = "tcp"
   from_port         = 443
   to_port           = 443

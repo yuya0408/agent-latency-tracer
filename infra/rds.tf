@@ -1,5 +1,5 @@
-# RDS for PostgreSQL with pgvector, reachable only from inside the VPC. For
-# now only the bastion may connect; the MCP server on AgentCore is added later.
+# RDS for PostgreSQL with pgvector, reachable only from inside the VPC: from
+# the bastion (loading, through the tunnel) and the MCP server on AgentCore.
 
 resource "aws_db_subnet_group" "main" {
   name       = "agent-latency-tracer"
@@ -34,6 +34,9 @@ resource "aws_db_instance" "main" {
   # RDS generates the password and keeps it in Secrets Manager, so it never
   # appears in the Terraform state.
   manage_master_user_password = true
+  # The MCP server logs in with a token signed by its role instead of a
+  # password (a DB user granted rds_iam; scripts/create_mcp_server_user.sql).
+  iam_database_authentication_enabled = true
 
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
