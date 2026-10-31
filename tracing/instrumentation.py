@@ -22,6 +22,7 @@ from contextlib import contextmanager
 from typing import Any, Iterator, Mapping, Sequence
 
 from opentelemetry import trace
+from opentelemetry.sdk.extension.aws.trace import AwsXRayIdGenerator
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SimpleSpanProcessor
@@ -101,7 +102,13 @@ def build_tracer_provider(
     """
     if not exporters:
         raise ValueError("at least one exporter is required")
-    provider = TracerProvider(resource=Resource.create({"service.name": service_name}))
+    # X-Ray-format trace IDs (the first 8 hex digits are the start time). The
+    # CloudWatch console reads the time from the ID to open a trace that isn't
+    # in the index; with the SDK's random IDs it says the trace has expired
+    # (docs/DESIGN.md §5). Still valid W3C IDs, so SQLite and the viewer don't care.
+    provider = TracerProvider(
+        resource=Resource.create({"service.name": service_name}), id_generator=AwsXRayIdGenerator()
+    )
     for exporter in exporters:
         if batch:
             provider.add_span_processor(BatchSpanProcessor(exporter, schedule_delay_millis=BATCH_EXPORT_INTERVAL_MS))
