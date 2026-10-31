@@ -120,11 +120,20 @@
 - **AgentCore Observability**(2026-10-28に解決): `UNIFIED_TRACES_DESTINATION_ENABLED=false`で基盤側のspanもaws/spansに寄せ、
   `logs:PutResourcePolicy`は戻していない。ADOTは使わず、`DISABLE_ADOT_OBSERVABILITY=true`でRuntimeが入れる`OTEL_*`の
   環境変数を消した(標準のOTLPエクスポーターがヘッダなどを環境変数からも読むため)
-- **AWSの画面でトレースを見る方法**(段階5で決める): aws/spansにはspanがすべて残り、Logs Insightsで`traceId`を指定すれば
-  集められる。一方、画面のトレースの詳細(waterfall)とトレースの一覧は、索引(トレースの要約)に入ったトレースだけを表示する。
-  初期値の1%では、手元から流す少ないトレースはまず表示されない(2026-10-27、`batch-get-traces`で0件)。サーバ側のspanが
-  手元のSQLiteに届かなくなる段階5で、索引の割合を上げて画面を使うか、自作のwaterfallにaws/spansから読む機能を足すかを
-  一緒に決める。1%を超える分は、索引に入れたspanの数で課金される
+- **AWSの画面でトレースを見る方法**(2026-10-31に解決): 索引の割合は1%のまま、トレースIDをX-Ray形式にして、画面の
+  waterfallで見る。事例の記録に載せるトレースは、`StartTraceRetrieval`で取り出して自作のwaterfallで書き出す(段階6の前に作る)
+  - トレースの一覧と`batch-get-traces`は、索引(トレースの要約)に入ったトレースだけを返す。索引はトレースIDごとに確率で選ばれる
+    (初期値1%)ので、手元から流す少ないトレースはまず入らない(2026-10-27に0件)。基盤のヘルスチェックと思われる2spanの
+    トレースが約2秒おきに入っていたが、確率で選ぶので、自分のトレースの枠を奪うわけではない
+  - 索引に入っていないトレースも、トレースIDを指定すれば画面のトレースの詳細(waterfall)で開ける(スマホでも見えた)。
+    ただしIDの先頭8桁を作成時刻(Unix時刻の16進数)として読むので、OpenTelemetryの既定のランダムなIDでは
+    「有効期限が切れています」になる(先頭が2014年を指したID)。先頭を今の時刻にしたIDで送ると開けた
+  - APIの`StartTraceRetrieval`→`ListRetrievedTraces`(`--trace-format OTEL`)では、時刻の範囲を指定すれば
+    既定のIDのトレースも取り出せた(32spanすべて)
+  - 閲覧用のIAMユーザーには、AWS管理ポリシー`CloudWatchReadOnlyAccess`が要る。画面は索引外のトレースを
+    `xray:StartTraceRetrieval`で取り出しており、これが無いと開けない
+  - 割合を上げる案は採らない。1%を超える分は索引に入れたspanの数で課金され、索引は条件(サービス名など)では絞れず
+    割合しか指定できない。費用自体は小さい見込み(公式価格での概算で、Runtimeを1か月置いて100%にしても約2ドル。東京の単価は未確認)
 - RDSで使えるpgvectorのバージョン(2026-10-25に解決): 東京のRDS for PostgreSQL 18系では0.8.1(18.1〜18.3)・
   0.8.2(18.4以降)。初期設定の18.3では0.8.1だった(§8)
 - この PC の CPU で llama.cpp の小さいモデルがどれくらいの速さで動くか(ツール定義入りのプロンプトで)
@@ -184,7 +193,7 @@
     サーバのspanが1本のトレースとしてaws/spansに入った(エージェントの`MCP send`→`AgentCore.Runtime.Invoke`→`POST /mcp`)
   - [x] 検索をRDSに切り替え(2026-10-28)。MCPサーバは専用のDBユーザー(`rds_iam`、`documents`の読み取りだけ)にIAMのトークンで
     ログインし、SSLは`verify-full`。`SELECT documents`のspanが`tools/call retrieve_documents`の子として同じトレースに入った
-  - 残り: AWSの画面でトレースを見る方法(§5)は未決。今は`traceId`を指定してLogs Insightsで集めている
+  - [ ] トレースIDをX-Ray形式にする(エージェントとMCPサーバ)。画面の見方は§5(2026-10-31に決定)
 - [ ] 5b. `toolcall-serving-bench`を終えた後で、GPUのEC2(推論サーバ＋Qwen3-8B)を同じVPCに置き、エージェントを
   AgentCore Runtimeに移す。GPUのTerraformは`toolcall-serving-bench`のものを元にする。同じAWSアカウントの
   月60ドルの予算を分け合うので、`toolcall-serving-bench`の実行と同じ月に回さない(g6.xlargeは1時間約$1.17)
