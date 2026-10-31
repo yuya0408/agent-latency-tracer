@@ -75,8 +75,9 @@ class _SessionPin:
     requests stay on one microVM; without it each one may land on a new one
     and wait for its cold start (5-8s each when this was first measured).
 
-    The SDK only keeps a session id from an `initialize` response, and with
-    a server that answers `server/discover` it never sends `initialize`."""
+    The 2026-07-28 protocol has no sessions, so the SDK doesn't send one back;
+    AgentCore's routing relies on this header anyway, and its docs ask clients
+    to return it."""
 
     def __init__(self) -> None:
         self._session_id: str | None = None

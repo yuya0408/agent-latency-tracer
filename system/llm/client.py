@@ -16,7 +16,7 @@ from typing import Any
 
 import httpx2
 from mcp import types
-from opentelemetry import trace
+from opentelemetry import propagate, trace
 
 from tracing.instrumentation import chat_span, mark_error, set_chat_usage
 
@@ -122,7 +122,11 @@ class LlmClient:
         calls: dict[int, dict[str, Any]] = {}  # tool calls arrive in pieces, keyed by index
         result = ChatResult(content="")
         first_token_seen = False
-        async with self._http.stream("POST", self._url, json=body) as response:
+        # The chat span is current here, so a server that traces (vLLM) parents
+        # its span on it and joins this trace.
+        headers: dict[str, str] = {}
+        propagate.inject(headers)
+        async with self._http.stream("POST", self._url, json=body, headers=headers) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
                 if not line.startswith("data: "):
