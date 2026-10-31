@@ -103,6 +103,18 @@ def test_request_body():
     }]
 
 
+def test_traceparent_points_at_the_chat_span():
+    sent: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        sent.append(request.headers["traceparent"])
+        return httpx2.Response(200, content=_sse(TEXT_CHUNKS), headers={"content-type": "text/event-stream"})
+
+    _chat(handler)
+    context = _chat_span().get_span_context()
+    assert sent == [f"00-{context.trace_id:032x}-{context.span_id:016x}-{int(context.trace_flags):02x}"]
+
+
 def test_temperature_is_passed_through():
     sent: list[dict] = []
     _chat(_streaming(TEXT_CHUNKS, sent), temperature=0.8)
