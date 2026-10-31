@@ -1,6 +1,6 @@
 # 設計書: agent-latency-tracer
 
-最終更新: 2026-10-04
+最終更新: 2026-10-31
 
 「今どこまでできていて、次に何をやるか」を把握するための設計書。目的・構成・事例集は
 [README.md](../README.md)、事例の出典は [latency-pitfalls-survey.md](latency-pitfalls-survey.md)。
@@ -14,7 +14,9 @@
 | 認証 | IAMの署名(SigV4) | 手元のクレデンシャルで済み、Cognito(ユーザー管理)が要らない |
 | RAG | RDS for PostgreSQL + pgvector、VPCの中だけ | 検索はMCPサーバのツールの1つで、使うかどうかはLLMが決める。AgentCoreのVPCモードでRDSにつなぎ、RDSはインターネットに出さない |
 | MCPのSDKとプロトコルの版 | 公式Python SDK `mcp==2.3.0`(低レベルAPI)。プロトコルはSDKの初期設定のまま(2026-07-28版。相手が古い版なら自動で切り替わる) | 新しく作るなら何も指定しない状態が自然。古い版に固定する理由(「今は古い版が多い」)は推測にすぎなかった |
-| LLM | 段階5までは手元のllama.cpp(公式Dockerイメージ`ghcr.io/ggml-org/llama.cpp:server`、b11434)で、Qwen3.5-2B(Q4_K_M、1.28GB)。段階5b以降は、`toolcall-serving-bench`で組んだGPUのEC2(g6.xlarge、NVIDIA L4)で、Qwen3-8B。エンジンは、その時点の`toolcall-serving-bench`の結果を見て決める。どちらもthinkingはオフ | 段階5までは、つながることを確かめるだけでLLMの性能は効かないので、費用のかからない手元で進める。事例の再現(段階6)では、LLMが時間の大半を占めないGPUにする(「LLMの動かし方とモデルの大きさ」)。偽LLMは自動テストの中だけで使う |
+| LLM | 段階5までは手元のllama.cpp(公式Dockerイメージ`ghcr.io/ggml-org/llama.cpp:server`、b11434)で、Qwen3.5-2B(Q4_K_M、1.28GB)。段階5b以降は、GPUのEC2(g6.xlarge、NVIDIA L4)でvLLM 0.31.0とQwen3-8B bf16(2026-10-31決定)。どちらもthinkingはオフ | 段階5までは、つながることを確かめるだけでLLMの性能は効かないので、費用のかからない手元で進める。事例の再現(段階6)では、LLMが時間の大半を占めないGPUにする(「LLMの動かし方とモデルの大きさ」)。偽LLMは自動テストの中だけで使う |
+| 段階5b以降のエンジン | vLLM 0.31.0、Qwen3-8B bf16。リクエストごとの内訳は応答の本文から取り(`--enable-per-request-metrics`・`--enable-prompt-tokens-details`)、エンジンのspan(`--otlp-traces-endpoint`)は補助にする | `toolcall-serving-bench`(L4 1台・Qwen3-8B)で精度の足切りを通ったのはvLLM bf16・FP8とTensorRT-LLM bf16・FP8の4構成で、目標の並行数が2以下では同じ台数で並び、ベンチは決めていない。このプロジェクトは質問を1つずつ流すので並行数は1〜2で、ベンチの結論からは決まらない。そこで、事例8/9・10・M1・12がエンジンの中で起きることから、中を見る手段で選んだ。vLLMはHTTPの`traceparent`を親にして`llm_request` spanを作り、待ち行列・プリフィル・デコードの時間を付ける。応答の本文にも待ち行列の時間とキャッシュに当たったトークン数が入り、llama.cppの`timings`と同じ作りで記録できる(v0.31.0のソースで確認)。版と起動の手順はベンチで固定済み。**採らなかった案**: TensorRT-LLM(1.2.1のトレースは試作段階の扱いで、親の引き継ぎを確かめていない。並行数4以上の台数の利点は、並行数1〜2では効かない)。FP8(並行数1〜2では台数の利点が無く、vLLMのFP8はL4ではW8A16で計算する、という注意書きが増える。文脈の長さがbf16で載らなければ見直す)。SGLang・AWQ(ベンチで精度の非劣化を示せなかった)。エンジンを比べ直すことはしない |
+| 遅かった1件の見つけ方 | エージェントが質問ごとにtrace_idと所要時間を構造化ログに出す | 画面のトレースの一覧は索引(1%)に入ったものしか出ないので、「遅かった」と言われた1件はログからtrace_idを引いて開く(§5)。手順書の最初の段にする |
 | トレースの集め先 | CloudWatch(Transaction Search) | AgentCoreの基盤側のspanと同じ場所に集める。実務で標準的なやり方 |
 | Transaction Searchの設定 | `infra/account/`(状態ファイルは別のキー)で有効にし、段階ごとに消す`infra/`とは分けて残す。送り先はCloudWatch Logs、索引は初期値の1% | アカウントとリージョンに1つの設定。Terraformの説明では、送り先と索引のリソースを消してもAWS側の設定は戻らず、X-Rayに書き込みを許すログのリソースポリシーだけが消えて壊れる。spanを送らなければ費用はかからない。索引の割合は段階5で決める(§5) |
 | 手元からCloudWatchへの送信 | ADOTを使わず、OTel標準のOTLP/HTTPの送信部品に、botocoreでSigV4の署名をする`requests`のセッションを渡す(ADOTの`OTLPAwsSpanExporter`と同じ作り)。SQLiteへの保存は残し、CloudWatchは2つ目の送り先にする(`run_agent.py --cloudwatch`) | ADOTはOTelのSDKを1つの版に固定し、約50個の計装を一緒に入れ、TracerProviderを自分で組む前提で、このプロジェクトの`build_tracer_provider`と合わない。段階5のコンテナ(AgentCoreの公式の手順はADOTが前提)では見直す。SQLiteを残すのは「手元での開発」と同じ理由 |
@@ -195,10 +197,24 @@
     ログインし、SSLは`verify-full`。`SELECT documents`のspanが`tools/call retrieve_documents`の子として同じトレースに入った
   - [x] トレースIDをX-Ray形式にする(2026-10-31。`build_tracer_provider`で`AwsXRayIdGenerator`を使う)。画面の見方は§5。
     基盤側のspanがこのIDを引き継いで1本のトレースのままになるかは、5bでRuntimeを立てたときに確かめる
-- [ ] 5b. `toolcall-serving-bench`を終えた後で、GPUのEC2(推論サーバ＋Qwen3-8B)を同じVPCに置き、エージェントを
-  AgentCore Runtimeに移す。GPUのTerraformは`toolcall-serving-bench`のものを元にする。同じAWSアカウントの
-  月60ドルの予算を分け合うので、`toolcall-serving-bench`の実行と同じ月に回さない(g6.xlargeは1時間約$1.17)
-- [ ] 6. 事例を1つずつ再現し、手順書に書き、トレースを書き出す
+- [ ] 5b. GPUのEC2(vLLM＋Qwen3-8B、§1)を同じVPCに置き、エージェントをAgentCore Runtimeに移す。
+  GPUのTerraformは`toolcall-serving-bench`のものを元にする(g6.xlargeは1時間約$1.17、月60ドルの予算は同じアカウントで分け合う)。
+  `toolcall-serving-bench`は2026-10-30に終えた。作る前に決めること・作ること:
+  - [ ] エージェントからLLMへの呼び出しに`traceparent`を付ける(`system/llm/`に無い。無いとエンジンのspanが別のトレースになる)
+  - [ ] エンジンのspanをCloudWatchへ送る経路。vLLMの送信部品はSigV4で署名できないので、GPUのEC2にOTel Collectorを置いて中継する案(推定、AWSの文書は未確認)。
+    xrayのエンドポイントのSGに、GPUのSGからの受け入れを足す
+  - [ ] 外への出口が無いVPCに、vLLMと重み(約16GB)を入れる方法。ベンチはデフォルトVPC・公開IPで、HFから直接取っていた。
+    S3のゲートウェイ型エンドポイント(無料)経由の案と、NATを置く案(時間と転送量の課金)
+  - [ ] g6は東京では1aと1cにしか無い。サブネットは`apne1-az1`だけなので、それが1a・1cのどちらに当たるかを確かめ、
+    容量不足のときの扱いを決める(ベンチでは約1.5時間続いたことがある)
+  - [ ] 文脈の長さ(`--max-model-len`)。ベンチの8192は引き継がない(§7の9で既に上限に当たった)。複数ターンで要る長さから決め、
+    bf16の重みと同じL4に載るかを確かめる
+  - [ ] エンジンの起動フラグ: `--enable-per-request-metrics`・`--enable-prompt-tokens-details`。vLLMの`time_to_first_token_ms`は
+    待ち行列の時間を含まないので、クライアント側のTTFTとは別の名前で記録する。Prometheusの`/metrics`はCloudWatchに送らず、
+    事例の前後で保存する
+- [ ] 6. 事例を1つずつ再現し、手順書に書き、トレースを書き出す。事例ごとに「症状 → 最初に立てた仮説 → 決め手になったspan・属性」の
+  形で書く(§7の2・12の書き方)。#3・M2は§7の4・9・12で実際に起きたので、再現し直さずその記録から書く。#12の並行数は、
+  想定する利用者の数から先に決める
 
 ## 7. 動かしていて見つかったこと(手順書の「自然に発生」の候補)
 
