@@ -193,7 +193,8 @@
     サーバのspanが1本のトレースとしてaws/spansに入った(エージェントの`MCP send`→`AgentCore.Runtime.Invoke`→`POST /mcp`)
   - [x] 検索をRDSに切り替え(2026-10-28)。MCPサーバは専用のDBユーザー(`rds_iam`、`documents`の読み取りだけ)にIAMのトークンで
     ログインし、SSLは`verify-full`。`SELECT documents`のspanが`tools/call retrieve_documents`の子として同じトレースに入った
-  - [ ] トレースIDをX-Ray形式にする(エージェントとMCPサーバ)。画面の見方は§5(2026-10-31に決定)
+  - [x] トレースIDをX-Ray形式にする(2026-10-31。`build_tracer_provider`で`AwsXRayIdGenerator`を使う)。画面の見方は§5。
+    基盤側のspanがこのIDを引き継いで1本のトレースのままになるかは、5bでRuntimeを立てたときに確かめる
 - [ ] 5b. `toolcall-serving-bench`を終えた後で、GPUのEC2(推論サーバ＋Qwen3-8B)を同じVPCに置き、エージェントを
   AgentCore Runtimeに移す。GPUのTerraformは`toolcall-serving-bench`のものを元にする。同じAWSアカウントの
   月60ドルの予算を分け合うので、`toolcall-serving-bench`の実行と同じ月に回さない(g6.xlargeは1時間約$1.17)

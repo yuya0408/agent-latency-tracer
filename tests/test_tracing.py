@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -222,3 +223,15 @@ def test_list_traces_returns_one_row_per_trace(db_path):
     assert traces[0]["trace_id"] == trace_id
     assert traces[0]["name"] == "invoke_agent erp-chat"
     assert traces[0]["duration_ms"] >= 0
+
+
+def test_trace_ids_start_with_the_start_time(db_path):
+    # X-Ray format: the CloudWatch console reads the first 8 hex digits as the
+    # trace's start time (docs/DESIGN.md §5).
+    provider, tracer = _make_tracer(db_path)
+    before = int(time.time())
+    trace_id = _run_synthetic_pipeline(tracer, capture_content=False)
+    after = int(time.time())
+    provider.shutdown()
+
+    assert before <= int(trace_id[:8], 16) <= after

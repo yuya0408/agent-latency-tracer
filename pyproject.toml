@@ -6,6 +6,8 @@ requires-python = ">=3.11"
 dependencies = [
     "opentelemetry-api>=1.27",
     "opentelemetry-sdk>=1.27",
+    # X-Ray-format trace IDs, so the CloudWatch console can open any trace
+    "opentelemetry-sdk-extension-aws>=2.0",
     "numpy>=1.25",
     "faiss-cpu>=1.9",
     # Pinned: v2 API, and the server-side OTel middleware is still provisional.
