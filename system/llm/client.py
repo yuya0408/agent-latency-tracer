@@ -42,6 +42,16 @@ _TIMINGS = {
     "predicted_n": LLAMACPP_PREDICTED_N,
     "predicted_ms": LLAMACPP_PREDICTED_MS,
 }
+# vLLM's per-request breakdown (--enable-per-request-metrics). Its TTFT leaves
+# out the time in the queue, so it is not the same number as TTFT_MS.
+_VLLM_METRICS = {
+    "queue_time_ms": "vllm.queue_time_ms",
+    "time_to_first_token_ms": "vllm.time_to_first_token_ms",
+    "generation_time_ms": "vllm.generation_time_ms",
+    "mean_itl_ms": "vllm.mean_itl_ms",
+    "tokens_per_second": "vllm.tokens_per_second",
+}
+VLLM_CACHED_TOKENS = "vllm.cached_tokens"  # needs --enable-prompt-tokens-details
 
 
 @dataclass
@@ -158,9 +168,15 @@ class LlmClient:
                         output_tokens=chunk["usage"].get("completion_tokens"),
                         response_model=chunk.get("model"),
                     )
+                    details = chunk["usage"].get("prompt_tokens_details") or {}
+                    if details.get("cached_tokens") is not None:
+                        span.set_attribute(VLLM_CACHED_TOKENS, details["cached_tokens"])
                 for key, attribute in _TIMINGS.items():
                     if key in chunk.get("timings", {}):
                         span.set_attribute(attribute, chunk["timings"][key])
+                for key, attribute in _VLLM_METRICS.items():
+                    if (chunk.get("metrics") or {}).get(key) is not None:
+                        span.set_attribute(attribute, chunk["metrics"][key])
         if result.finish_reason:
             set_chat_usage(span, finish_reasons=[result.finish_reason])
         result.content = "".join(content)

@@ -155,6 +155,41 @@ def test_span_attributes():
     assert attrs["llamacpp.predicted_ms"] == 900.0
 
 
+def test_span_attributes_from_vllm():
+    _chat(_streaming([
+        {"choices": [{"index": 0, "delta": {"content": "在庫"}}]},
+        {"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]},
+        {
+            "choices": [],
+            "usage": {"prompt_tokens": 162, "completion_tokens": 20, "prompt_tokens_details": {"cached_tokens": 160}},
+            "metrics": {
+                "queue_time_ms": 0.03,
+                "time_to_first_token_ms": 65.0,
+                "generation_time_ms": 1200.0,
+                "mean_itl_ms": 60.0,
+                "tokens_per_second": 16.0,
+            },
+        },
+    ]))
+    attrs = _chat_span().attributes
+    assert attrs["vllm.queue_time_ms"] == 0.03
+    assert attrs["vllm.time_to_first_token_ms"] == 65.0
+    assert attrs["vllm.generation_time_ms"] == 1200.0
+    assert attrs["vllm.mean_itl_ms"] == 60.0
+    assert attrs["vllm.tokens_per_second"] == 16.0
+    assert attrs["vllm.cached_tokens"] == 160
+
+
+def test_no_vllm_attributes_from_llama_cpp():
+    _chat(_streaming(TOOL_CALL_CHUNKS))
+    assert not [name for name in _chat_span().attributes if name.startswith("vllm.")]
+
+
+def test_no_cached_tokens_when_the_server_leaves_them_empty():
+    _chat(_streaming([{"choices": [], "usage": {"prompt_tokens": 162, "prompt_tokens_details": None}}]))
+    assert "vllm.cached_tokens" not in _chat_span().attributes
+
+
 def test_no_ttft_when_nothing_is_generated():
     # Only a finish chunk: there is no first token to time.
     _chat(_streaming([{"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}]))
