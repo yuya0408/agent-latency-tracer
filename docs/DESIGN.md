@@ -16,7 +16,7 @@
 | MCPのSDKとプロトコルの版 | 公式Python SDK `mcp==2.3.0`(低レベルAPI)。プロトコルはSDKの初期設定のまま(2026-07-28版。相手が古い版なら自動で切り替わる) | 新しく作るなら何も指定しない状態が自然。古い版に固定する理由(「今は古い版が多い」)は推測にすぎなかった |
 | LLM | 段階5までは手元のllama.cpp(公式Dockerイメージ`ghcr.io/ggml-org/llama.cpp:server`、b11434)で、Qwen3.5-2B(Q4_K_M、1.28GB)。段階5b以降は、GPUのEC2(g6.xlarge、NVIDIA L4)でvLLM 0.31.0とQwen3-8B bf16(2026-10-31決定)。どちらもthinkingはオフ | 段階5までは、つながることを確かめるだけでLLMの性能は効かないので、費用のかからない手元で進める。事例の再現(段階6)では、LLMが時間の大半を占めないGPUにする(「LLMの動かし方とモデルの大きさ」)。偽LLMは自動テストの中だけで使う |
 | 段階5b以降のエンジン | vLLM 0.31.0、Qwen3-8B bf16。リクエストごとの内訳は応答の本文から取り(`--enable-per-request-metrics`・`--enable-prompt-tokens-details`)、エンジンのspan(`--otlp-traces-endpoint`)は補助にする | `toolcall-serving-bench`(L4 1台・Qwen3-8B)で精度の足切りを通ったのはvLLM bf16・FP8とTensorRT-LLM bf16・FP8の4構成で、目標の並行数が2以下では同じ台数で並び、ベンチは決めていない。このプロジェクトは質問を1つずつ流すので並行数は1〜2で、ベンチの結論からは決まらない。そこで、事例8/9・10・M1・12がエンジンの中で起きることから、中を見る手段で選んだ。vLLMはHTTPの`traceparent`を親にして`llm_request` spanを作り、待ち行列・プリフィル・デコードの時間を付ける。応答の本文にも待ち行列の時間とキャッシュに当たったトークン数が入り、llama.cppの`timings`と同じ作りで記録できる(v0.31.0のソースで確認)。版と起動の手順はベンチで固定済み。**採らなかった案**: TensorRT-LLM(1.2.1のトレースは試作段階の扱いで、親の引き継ぎを確かめていない。並行数4以上の台数の利点は、並行数1〜2では効かない)。FP8(並行数1〜2では台数の利点が無く、vLLMのFP8はL4ではW8A16で計算する、という注意書きが増える。文脈の長さがbf16で載らなければ見直す)。SGLang・AWQ(ベンチで精度の非劣化を示せなかった)。エンジンを比べ直すことはしない |
-| 出口の無いVPCへのvLLMと重みの入れ方 | vLLMはコンテナにしてECRに置き、重みはS3に置いて、ゲートウェイ型エンドポイントから取る。どちらも`infra/`とは別に残す。最初の1回だけ、公開IPつきの仮のGPUサーバでイメージと重みを移し、起動フラグ・文脈の長さ・`traceparent`の引き継ぎを確かめる | コンテナでGPUを動かす経験を得るため(学ぶ目的)。公式イメージ`vllm/vllm-openai:v0.31.0`(圧縮時10.13GB)の保管は月約$1で、費用は決め手にならない。`transformers`はベンチの5.17.0に合わせ、イメージの版が違えばその1行だけ足す。**採らなかった案**: Python環境を固めてS3に置く(保管は月約$0.25で、ベンチの手順をそのまま使えるが、差は小さい)。NAT(作るたびに転送料金がかかり、VPCに外への出口ができる)。重みをAMIやコンテナに入れる(AMIはスナップショットから初めて読む部分が遅く、コンテナは重みを変えるたびに作り直しになる) |
+| 出口の無いVPCへのvLLMと重みの入れ方 | vLLMはコンテナにしてECRに置き、重みはS3に置いて、ゲートウェイ型エンドポイントから取り、起動のたびにインスタンス付属のNVMeへコピーして読む(§8)。どちらも`infra/`とは別に残す。最初の1回だけ、公開IPつきの仮のGPUサーバでイメージと重みを移し、起動フラグ・文脈の長さ・`traceparent`の引き継ぎを確かめる | コンテナでGPUを動かす経験を得るため(学ぶ目的)。公式イメージ`vllm/vllm-openai:v0.31.0`(圧縮時10.13GB)の保管は月約$1で、費用は決め手にならない。`transformers`はベンチの5.17.0に合わせ、イメージの版が違えばその1行だけ足す。**採らなかった案**: Python環境を固めてS3に置く(保管は月約$0.25で、ベンチの手順をそのまま使えるが、差は小さい)。NAT(作るたびに転送料金がかかり、VPCに外への出口ができる)。重みをAMIやコンテナに入れる(AMIはスナップショットから初めて読む部分が遅く、コンテナは重みを変えるたびに作り直しになる) |
 | エンジンのspanの中継 | GPUのEC2でOpenTelemetry Collectorのcontrib版を、版を固定して動かす。vLLMからgRPCで受け、`sigv4auth`で署名してOTLP/HTTPで`xray`の受付口へ送る。spanを加工する部品は入れない | vLLMの送信部品はSigV4で署名できず、受付口はgRPCを受けない。AWSのCollectorの手順に沿え、AWS以外の環境でも同じ形で使える。**採らなかった案**: CloudWatch agent(今のAWSの文書が大抵の場合に勧めており設定も短いが、利点の多くはここで使わない連携にある)。ADOT Collector(役割も設定もほぼ同じで、contrib版で動かなければ切り替える)。以前ADOTを外した理由はPython側のSDKの話で、Collectorの選定には当てはまらない |
 | 遅かった1件の見つけ方 | エージェントが質問ごとにtrace_idと所要時間を構造化ログに出す | 画面のトレースの一覧は索引(1%)に入ったものしか出ないので、「遅かった」と言われた1件はログからtrace_idを引いて開く(§5)。手順書の最初の段にする |
 | トレースの集め先 | CloudWatch(Transaction Search) | AgentCoreの基盤側のspanと同じ場所に集める。実務で標準的なやり方 |
@@ -67,6 +67,8 @@
 | [system/mcp_client.py](../system/mcp_client.py) | SDKの`Client`を包み、tool呼び出しを`execute_tool` spanで囲む。HTTPヘッダにも`traceparent`を載せる(`httpx2`の`event_hooks`)。AgentCoreのURLならSigV4で署名し、`Mcp-Session-Id`を送り返す(§7の12)。`async with`の間は接続を使い回す | ✅ |
 | [scripts/try_mcp.py](../scripts/try_mcp.py) | 手元の動作確認。ツール3つを「1つずつ」と「同時に」で呼び、waterfallを`out/`に出す | ✅ |
 | [scripts/run_agent.py](../scripts/run_agent.py) | 手元の動作確認。仮の質問(§6の3)をエージェントに流し、質問ごとのwaterfallを`out/`に出す | ✅ |
+| [scripts/gpu_prepare.sh](../scripts/gpu_prepare.sh)・[infra/gpu_prepare/](../infra/gpu_prepare/) | 仮のGPUサーバと、その中で動かす手順。イメージと重みを移し、本番と同じ経路で1回試す。ふだんは作らない。NVMeを使う形に直した後は動かしていない | ✅ |
+| [system/serving/otel-collector.yaml](../system/serving/otel-collector.yaml) | Collectorの設定(§1) | ✅ |
 | [system/llm/](../system/llm/) | OpenAI互換クライアント。ストリーミングで受け、chat spanにTTFTとllama.cppの内訳(`timings`)を記録する。断片で届くツール呼び出しを組み立てる。HTTPヘッダに`traceparent`を載せる | ✅ |
 | [system/agent.py](../system/agent.py) | エージェントループ(§1の「エージェントの基本形」) | ✅ |
 | [infra/](../infra/) | Terraform(VPC・RDS・踏み台・AgentCore Runtime・基盤側のspanの配送)。`infra/account/`はTransaction Search。`infra/artifacts/`はvLLMとCollectorのイメージ(ECR)と重み(S3)の置き場で、段階ごとに消さない | ✅ |
@@ -203,17 +205,19 @@
   GPUのTerraformは`toolcall-serving-bench`のものを元にする(g6.xlargeは1時間約$1.17、月60ドルの予算は同じアカウントで分け合う)。
   `toolcall-serving-bench`は2026-10-30に終えた。作る前に決めること・作ること:
   - [x] エージェントからLLMへの呼び出しに`traceparent`を付ける(2026-10-31。親は`chat` span。エンジンが実際に引き継ぐかは5bで確かめる)
-  - [ ] 仮のGPUサーバ(公開IPつき)で、公式イメージをECRへ、重みをS3へ移す(§1)。あわせて確かめること: `docker run --gpus all`(AMIは
-    ベンチのUbuntu 22.04版のままか24.04版か)、イメージの`transformers`の版とOTelの依存、下の起動フラグと文脈の長さ、`traceparent`の引き継ぎ、Collector経由でspanが届くこと
+  - [x] 仮のGPUサーバ(公開IPつき)で、公式イメージをECRへ、重みをS3へ移す(2026-10-31。§1、`scripts/gpu_prepare.sh`)。コンテナからGPUが使え(Ubuntu 24.04版のDLAMI)、
+    `transformers`はベンチと同じ5.17.0で、OTelの依存も入っていたので、イメージは公式のまま使う。実測は§8
   - [ ] GPUのEC2をVPCに置く。Terraformで足すもの: S3のエンドポイントのポリシーに重みのバケット、ECRとxrayのエンドポイントのSGにGPUのSGからの受け入れ、
-    IAMロール(ECRの取得・S3の読み取り・`xray:PutSpans`・SSM)。Collectorのコンテナが認証情報を取れるよう、IMDSの段数の上限を2にするか、ホストのネットワークで動かす
+    IAMロール(ECRの取得・S3の読み取り・`xray:PutSpans`・`xray:PutTraceSegments`・SSM)。コンテナはホストのネットワークで動かす(Collectorが認証情報を取れ、vLLMから`127.0.0.1`で送れる)
+  - [ ] **未確認**: vLLMが`traceparent`を引き継ぎ、Collector経由でspanがCloudWatchに届くこと。仮のGPUサーバでは、ロールの権限が足りず送信が403になり、確かめる前に消した。
+    上のEC2を置いたときに確かめる。Collectorは何らかのspanを受け取って送信まで進んでいた(403の記録が23回)が、それがvLLMのspanか、トレースIDを引き継いでいたかは見ていない
   - [x] g6のAZ(2026-10-31)。g6.xlargeは`apne1-az1`(=1c)と`apne1-az4`にあり、今のサブネット(`apne1-az1`)に置ける。容量不足のとき
     (ベンチでは約1.5時間続いたことがある)はAZを変えず、待って再試行する。AZをまたぐ遅れを検索に混ぜないため。有料のエンドポイントを無駄に動かさないよう、GPUを最初に作る
-  - [ ] 文脈の長さ(`--max-model-len`)。案は16384で、仮のGPUサーバで確かめる。ベンチの8192は引き継がない(§7の9で既に上限に当たった)。
-    モデルの上限40,960は、ベンチで測ったbf16のKV(通常30,240トークン、新しいインスタンスの最初の起動は22,992)に載らない。
-    ツール定義1,360トークンに、ツール結果100行(1行50トークンと仮定し約5,000)が2回入ると8192を超える
-  - [ ] vLLMの応答の内訳をchat spanに記録する(`system/llm/`は今、llama.cppの`timings`だけに対応している)
-  - [ ] エンジンの起動フラグ: `--enable-per-request-metrics`・`--enable-prompt-tokens-details`。vLLMの`time_to_first_token_ms`は
+  - [x] 文脈の長さ(`--max-model-len`)は16384(2026-10-31)。KVは22,976トークンで載った(§8)。ベンチの8192は引き継がない(§7の9で既に上限に当たった)。
+    モデルの上限40,960はKVに載らない。ツール定義1,360トークンに、ツール結果100行(1行50トークンと仮定し約5,000)が2回入ると8192を超える
+  - [ ] vLLMの応答の内訳をchat spanに記録する(`system/llm/`は今、llama.cppの`timings`だけに対応している)。ストリーミングでは最後のチャンクの`metrics`
+    (`queue_time_ms`・`time_to_first_token_ms`・`generation_time_ms`・`mean_itl_ms`・`tokens_per_second`)と`usage.prompt_tokens_details.cached_tokens`にある
+  - [x] エンジンの起動フラグ: `--enable-per-request-metrics`・`--enable-prompt-tokens-details`(2026-10-31、応答に内訳が入ることを確認)。vLLMの`time_to_first_token_ms`は
     待ち行列の時間を含まないので、クライアント側のTTFTとは別の名前で記録する。Prometheusの`/metrics`はCloudWatchに送らず、
     事例の前後で保存する
 - [ ] 6. 事例を1つずつ再現し、手順書に書き、トレースを書き出す。事例ごとに「症状 → 最初に立てた仮説 → 決め手になったspan・属性」の
@@ -318,6 +322,17 @@
   - HNSWを作るのに87秒(`maintenance_work_mem`はその接続だけ1GB)、インデックスは781MB(見込みの約2倍)。表は533MB
   - 両方ともディスクからの読み込みは0で、メモリに収まっていた。`shared_buffers`約910MB、`effective_cache_size`約1.8GB
   - 投入はトンネル越しに600秒(約0.9MB/秒)。apply約6分、destroy約6分(インターフェース型エンドポイントの削除が約5分)
+- **仮のGPUサーバ(2026-10-31、g6.xlarge・1c、Ubuntu 24.04版のDLAMI 20261030、vLLM 0.31.0、Qwen3-8B bf16)**。apply〜destroyは1時間37分(約$1.9)。
+  確認の途中で権限待ちになった時間を含む。時間は1回ずつの値:
+  - 重みの読み込み: **ルートのEBS(gp3 100GB、初期設定)で580秒、インスタンス付属のNVMe(233GB)で42秒**。起動全体は、NVMeで203秒、EBSで約13分。
+    EBSでは1シャードに約2分かかった。遅い理由は調べていない
+  - KV: 22,976トークン(`Maximum concurrency for 16,384 tokens: 1.40x`)。EBSからとNVMeからの2回とも同じ。読み込み後のGPU使用は23,034MiBのうち19,832MiB。
+    ベンチの通常の値30,240ではなく、ベンチが新しいインスタンスの最初の起動でだけ見た値(22,992)に近い。2回目の起動でも少ないので「最初だけ」では説明できない。原因は分かっていない
+  - 転送: イメージの取得約6分、ECRへのpushと取り直し約6分、重みのHFからの取得2分10秒とS3へのアップロードで合計約18分、S3から1分47秒(ルートのEBSへ)
+  - ECRの大きさ: vLLM 9.04GB、Collector 0.12GB。重みはS3に16.4GB、15ファイル。保管は合わせて月約$1.3
+  - 応答(ツール1つ、162トークン): TTFT 84ms、`queue_time_ms` 0.02〜0.05ms、`mean_itl_ms`約60ms、2回目は`cached_tokens` 160でTTFT 65ms。
+    約60msは、ベンチのTPOT(並行数1のp50)61.4msと同じ水準
+  - `xray:PutSpans`だけでは、OTLPの受付口が403を返した(`not authorized to perform: xray:PutTraceSegments`)
 - **AgentCore Runtime(2026-10-28)**:
   - イメージ(ARM64、python:3.14-slim)は約121MB。手元(QEMUで代わりに実行)でのビルドとpushに6〜7分
   - Runtimeの作成に4分48秒。作り直さなくても、環境変数を変えるとその場で更新される
