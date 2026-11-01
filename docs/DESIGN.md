@@ -68,8 +68,9 @@
 | [scripts/try_mcp.py](../scripts/try_mcp.py) | 手元の動作確認。ツール3つを「1つずつ」と「同時に」で呼び、waterfallを`out/`に出す | ✅ |
 | [scripts/run_agent.py](../scripts/run_agent.py) | 手元の動作確認。仮の質問(§6の3)をエージェントに流し、質問ごとのwaterfallを`out/`に出す | ✅ |
 | [scripts/gpu_prepare.sh](../scripts/gpu_prepare.sh)・[infra/gpu_prepare/](../infra/gpu_prepare/) | 仮のGPUサーバと、その中で動かす手順。イメージと重みを移し、本番と同じ経路で1回試す。ふだんは作らない。NVMeを使う形に直した後は動かしていない | ✅ |
+| [infra/gpu.tf](../infra/gpu.tf)・[infra/gpu_boot.sh.tftpl](../infra/gpu_boot.sh.tftpl) | VPCの中のGPUサーバ(vLLM＋Collector)と、起動手順。`terraform apply -target=aws_instance.gpu`で、要るエンドポイントごと作る | ✅ |
 | [system/serving/otel-collector.yaml](../system/serving/otel-collector.yaml) | Collectorの設定(§1) | ✅ |
-| [system/llm/](../system/llm/) | OpenAI互換クライアント。ストリーミングで受け、chat spanにTTFTとllama.cppの内訳(`timings`)を記録する。断片で届くツール呼び出しを組み立てる。HTTPヘッダに`traceparent`を載せる | ✅ |
+| [system/llm/](../system/llm/) | OpenAI互換クライアント。ストリーミングで受け、chat spanにTTFTとエンジンの内訳(llama.cppの`timings`、vLLMの`metrics`)を記録する。断片で届くツール呼び出しを組み立てる。HTTPヘッダに`traceparent`を載せる | ✅ |
 | [system/agent.py](../system/agent.py) | エージェントループ(§1の「エージェントの基本形」) | ✅ |
 | [infra/](../infra/) | Terraform(VPC・RDS・踏み台・AgentCore Runtime・基盤側のspanの配送)。`infra/account/`はTransaction Search。`infra/artifacts/`はvLLMとCollectorのイメージ(ECR)と重み(S3)の置き場で、段階ごとに消さない | ✅ |
 | `docs/runbook.md`・`traces/` | 手順書と根拠のトレース | ⬜ |
@@ -207,12 +208,11 @@
   - [x] エージェントからLLMへの呼び出しに`traceparent`を付ける(2026-10-31。親は`chat` span。エンジンが実際に引き継ぐかは5bで確かめる)
   - [x] 仮のGPUサーバ(公開IPつき)で、公式イメージをECRへ、重みをS3へ移す(2026-10-31。§1、`scripts/gpu_prepare.sh`)。コンテナからGPUが使え(Ubuntu 24.04版のDLAMI)、
     `transformers`はベンチと同じ5.17.0で、OTelの依存も入っていたので、イメージは公式のまま使う。実測は§8
-  - [ ] GPUのEC2をVPCに置く。Terraformで足すもの: S3のエンドポイントのポリシーに重みのバケット、ECRとxrayのエンドポイントのSGにGPUのSGからの受け入れ、
-    IAMロール(ECRの取得・S3の読み取り・`xray:PutSpans`・`xray:PutTraceSegments`・SSM)。コンテナはホストのネットワークで動かす(Collectorが認証情報を取れ、vLLMから`127.0.0.1`で送れる)
-  - [ ] **未確認**: vLLMが`traceparent`を引き継ぎ、Collector経由でspanがCloudWatchに届くこと。仮のGPUサーバでは、ロールの権限が足りず送信が403になり、確かめる前に消した。
-    上のEC2を置いたときに確かめる。Collectorは何らかのspanを受け取って送信まで進んでいた(403の記録が23回)が、それがvLLMのspanか、トレースIDを引き継いでいたかは見ていない
+  - [x] GPUのEC2をVPCに置く(2026-11-01、`infra/gpu.tf`)。起動すると推論サーバになる(`gpu_boot.sh.tftpl`)。コンテナはホストのネットワークで動かす(Collectorが認証情報を取れ、vLLMから`127.0.0.1`で送れる)。
+    S3のエンドポイントのポリシーに重みのバケット、ECR・xray・SSMのエンドポイントのSGにGPUのSGからの受け入れを足した。vLLMへの受け入れはまだ無く、エージェントのRuntimeを作るときに足す
+  - [x] vLLMが`traceparent`を引き継ぎ、Collector経由でspanがCloudWatchに届くこと(2026-11-01)。`llm_request` spanが、送った`chat` spanを親として同じトレースに入った。chat spanの`vllm.*`も実機で確認した(§8)
   - [x] g6のAZ(2026-10-31)。g6.xlargeは`apne1-az1`(=1c)と`apne1-az4`にあり、今のサブネット(`apne1-az1`)に置ける。容量不足のとき
-    (ベンチでは約1.5時間続いたことがある)はAZを変えず、待って再試行する。AZをまたぐ遅れを検索に混ぜないため。有料のエンドポイントを無駄に動かさないよう、GPUを最初に作る
+    (ベンチでは約1.5時間続いたことがある)はAZを変えず、待って再試行する。AZをまたぐ遅れを検索に混ぜないため。起動手順は再試行しないので、エンドポイントを先に作り、GPUを最後に作る(容量不足で失敗しても、消すまで1時間約$0.10)
   - [x] 文脈の長さ(`--max-model-len`)は16384(2026-10-31)。KVは22,976トークンで載った(§8)。ベンチの8192は引き継がない(§7の9で既に上限に当たった)。
     モデルの上限40,960はKVに載らない。ツール定義1,360トークンに、ツール結果100行(1行50トークンと仮定し約5,000)が2回入ると8192を超える
   - [x] vLLMの応答の内訳をchat spanに記録する(2026-11-01)。ストリーミングでは最後のチャンクの`metrics`
@@ -271,7 +271,10 @@
    #9(長い出力)の極端な形。chat spanの`gen_ai.usage.output_tokens`と`finish_reasons`で見つかる
 10. **TTFTとllama.cppの読み込み時間に差がある。** ツールを呼んだ1回目の呼び出しでは約600ms、答えを返す呼び出しでは
     50〜100ms。ツール呼び出しの書き出し部分の生成がTTFTに混ざると推測しているが、ツールを呼んで差が155msの回もあり、
-    確かめていない
+    llama.cppでは確かめていない。**vLLMでは同じ形の差を確かめた(2026-11-01、§8)**: ツールを呼ぶ応答では、クライアントのTTFTが約600ms、
+    vLLMの`time_to_first_token_ms`が約65ms。サーバの中で生の応答を見ると、最初の空のチャンクが94ms、ツール名の入った最初のチャンクが570msで、
+    その間はトークン8個分(1個約60ms)にあたる。v0.31.0の`hermes_tool_parser.py`は、`"name": "…"`が閉じるまで何も返さない(`_extract_tool_name`)ので、この待ちはパーサによる。生成そのものは止めないので、応答全体の時間は延びない。
+    つまりツールを呼ぶ応答のクライアントのTTFTには、入力の長さ(#8)と関係のない約500msが混ざる(ツール名が長いほど増える)。#8の切り分けでは`vllm.time_to_first_token_ms`を見る
 11. **CloudWatchへの同期の送信は、中身の無い親spanを537msにした。** 試しのスクリプトで、親spanの中で子spanを1本作って
     閉じただけで、`SimpleSpanProcessor`では親が537msになった。子spanが終わるたびに、署名とHTTPSの送信を呼び出し元で
     待つため。2(SQLiteの約67ms)と同じ形で、1桁大きい。`batch=True`では起きない。手元からAWSまでの往復が含まれるので、
@@ -329,12 +332,20 @@
   - 重みの読み込み: **ルートのEBS(gp3 100GB、初期設定)で580秒、インスタンス付属のNVMe(233GB)で42秒**。起動全体は、NVMeで203秒、EBSで約13分。
     EBSでは1シャードに約2分かかった。遅い理由は調べていない
   - KV: 22,976トークン(`Maximum concurrency for 16,384 tokens: 1.40x`)。EBSからとNVMeからの2回とも同じ。読み込み後のGPU使用は23,034MiBのうち19,832MiB。
-    ベンチの通常の値30,240ではなく、ベンチが新しいインスタンスの最初の起動でだけ見た値(22,992)に近い。2回目の起動でも少ないので「最初だけ」では説明できない。原因は分かっていない
+    ベンチの通常の値30,240より少ないのは、起動時のコンパイル(`torch.compile`)のキャッシュが無いため(2026-11-01にログで確認)。ベンチのbf16のログ28本で、キャッシュが無い7本は`peak activation` 1.61GiB(記録のある6本)・KV 3.16GiB・22,992トークン、
+    キャッシュがある21本は0.62GiB・4.15GiB・30,240トークンで、例外は無かった。こちらのログもコンパイル37秒・1.61GiB・3.16GiB。キャッシュはコンテナの中(`/root/.cache/vllm`)に置かれるので、`docker run`で作り直すと毎回無い状態になる。
+    なので新しいコンテナでは毎回22,976トークンで安定するが、**同じコンテナを`docker restart`すると約30,000トークンに増えるはず**(未確認)。事例の間でサーバを起動し直すときは、コンテナを作り直してKVをそろえる。16トークンの差は`--max-model-len`(8192と16384)かもしれないが、KVの差の大部分はこれでは説明できない
   - 転送: イメージの取得約6分、ECRへのpushと取り直し約6分、重みのHFからの取得2分10秒とS3へのアップロードで合計約18分、S3から1分47秒(ルートのEBSへ)
   - ECRの大きさ: vLLM 9.04GB、Collector 0.12GB。重みはS3に16.4GB、15ファイル。保管は合わせて月約$1.3
   - 応答(ツール1つ、162トークン): TTFT 84ms、`queue_time_ms` 0.02〜0.05ms、`mean_itl_ms`約60ms、2回目は`cached_tokens` 160でTTFT 65ms。
     約60msは、ベンチのTPOT(並行数1のp50)61.4msと同じ水準
   - `xray:PutSpans`だけでは、OTLPの受付口が403を返した(`not authorized to perform: xray:PutTraceSegments`)
+- **出口の無いVPCのGPUサーバ(2026-11-01、g6.xlarge・1c、イメージと重みはECR/S3から)**。destroyに11分半。GPUは約25分動かし、エンドポイントと合わせて約$0.6(概算)。時間は1回の値:
+  - 起動から応答できるまで12分半。起動手順の開始まで1分半、イメージの取得と重みのコピーで約6分、vLLMの起動で約4分半。KVは今回も22,976トークン
+  - トレース: 手元の`LlmClient`からSession Managerのポート転送で呼び、2本とも`chat`(手元)→`llm_request`(vLLM)が同じトレースに入った。Collectorのログにエラーは無かった。
+    `llm_request`は`vllm.tracing.otel`が出すSERVERのspanで、`gen_ai.latency.time_in_queue`・`time_in_model_prefill`・`time_in_model_decode`・`e2e`などを持つ
+  - `chat`の親に、手元のサービス名で同じ長さの`InternalOperation`というspanが`aws/spans`に入っていた。自作のコードには無いspanで、手元の記録(in-memory)にも無い。誰が足したかは調べていない
+  - TTFT(各3回、ポート転送越し): 文章の応答はクライアント118〜194ms・vLLM 61〜71ms、ツールを呼ぶ応答はクライアント596〜623ms・vLLM 64〜65ms(§7の10)
 - **AgentCore Runtime(2026-10-28)**:
   - イメージ(ARM64、python:3.14-slim)は約121MB。手元(QEMUで代わりに実行)でのビルドとpushに6〜7分
   - Runtimeの作成に4分48秒。作り直さなくても、環境変数を変えるとその場で更新される
