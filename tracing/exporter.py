@@ -11,6 +11,7 @@ migration -- only the attributes_json payload varies by span kind.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 from pathlib import Path
@@ -71,6 +72,23 @@ class SQLiteSpanExporter(SpanExporter):
 
     def force_flush(self, timeout_millis: int = 30_000) -> bool:
         return True
+
+
+def exporters_from_env() -> list[SpanExporter]:
+    """The destinations in TRACE_TO: "sqlite" (default, the file in TRACE_DB),
+    "cloudwatch" (needs the "aws" extra and AWS credentials), or both,
+    comma-separated."""
+    exporters: list[SpanExporter] = []
+    for name in os.environ.get("TRACE_TO", "sqlite").split(","):
+        if name == "sqlite":
+            exporters.append(SQLiteSpanExporter(os.environ.get("TRACE_DB", "traces.db")))
+        elif name == "cloudwatch":
+            from tracing.aws_exporter import cloudwatch_span_exporter  # needs the "aws" extra
+
+            exporters.append(cloudwatch_span_exporter())
+        else:
+            raise ValueError(f"unknown TRACE_TO destination: {name}")
+    return exporters
 
 
 def _span_to_row(span: ReadableSpan) -> tuple[Any, ...]:

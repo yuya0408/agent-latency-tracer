@@ -122,6 +122,14 @@ def test_temperature_is_passed_through():
     assert _chat_span().attributes["gen_ai.request.temperature"] == 0.8
 
 
+def test_provider_name_goes_on_the_span():
+    _chat(_streaming(TEXT_CHUNKS))
+    assert _chat_span().attributes["gen_ai.provider.name"] == "llama.cpp"
+    _EXPORTER.clear()
+    _chat(_streaming(TEXT_CHUNKS), provider_name="vllm")
+    assert _chat_span().attributes["gen_ai.provider.name"] == "vllm"
+
+
 def test_assembles_tool_calls_split_across_chunks():
     result = _chat(_streaming(TOOL_CALL_CHUNKS))
     assert result.finish_reason == "tool_calls"

@@ -1,4 +1,4 @@
-"""OpenAI-compatible chat client (llama.cpp's server), one `chat` span per call.
+"""OpenAI-compatible chat client (llama.cpp's server or vLLM), one `chat` span per call.
 
 Streams the response so the client can see when the first token arrives
 (time to first token, TTFT): that is what a chat user waits for, and it is
@@ -22,7 +22,7 @@ from tracing.instrumentation import chat_span, mark_error, set_chat_usage
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8080/v1"
 DEFAULT_MODEL = "Qwen3.5-2B-Q4_K_M"
-PROVIDER_NAME = "llama.cpp"
+DEFAULT_PROVIDER_NAME = "llama.cpp"
 # Prefill of the ~1400-token tool definitions alone takes ~25s on this CPU
 # (docs/DESIGN.md §8), far past httpx's 5s default.
 READ_TIMEOUT_S = 600.0
@@ -85,6 +85,7 @@ class LlmClient:
         *,
         base_url: str = DEFAULT_BASE_URL,
         model: str = DEFAULT_MODEL,
+        provider_name: str = DEFAULT_PROVIDER_NAME,
         thinking: bool = False,
         temperature: float = 0.0,
         http: httpx2.AsyncClient | None = None,
@@ -96,6 +97,7 @@ class LlmClient:
         self._tracer = tracer
         self._url = base_url.rstrip("/") + "/chat/completions"
         self._model = model
+        self._provider_name = provider_name
         self._thinking = thinking
         self._temperature = temperature
         self._http = http or httpx2.AsyncClient(timeout=httpx2.Timeout(5.0, read=READ_TIMEOUT_S))
@@ -118,7 +120,7 @@ class LlmClient:
             "chat_template_kwargs": {"enable_thinking": self._thinking},
         }
         with chat_span(
-            self._tracer, request_model=self._model, provider_name=PROVIDER_NAME, temperature=self._temperature
+            self._tracer, request_model=self._model, provider_name=self._provider_name, temperature=self._temperature
         ) as span:
             try:
                 return await self._stream(body, span)
