@@ -1,0 +1,47 @@
+#!/bin/bash
+# Runs once, as root, at the first boot of the GPU server (gpu.tf). Its output is
+# in /var/log/cloud-init-output.log. /opt/ready appears when vLLM is serving.
+set -euo pipefail
+
+shutdown -h +180
+
+VLLM_IMAGE=${registry}/agent-latency-tracer/vllm:v0.31.0
+COLLECTOR_IMAGE=${registry}/agent-latency-tracer/otel-collector:0.163.1
+MODEL_REPO=Qwen/Qwen3-8B
+MODEL_REVISION=b968826d9c46dd6066d109eabc6255188de91218
+MODEL_DIR=/opt/dlami/nvme/Qwen3-8B # loads in 42 s here, 580 s from the root volume
+PORT=8000
+# Without a region the CLI may use S3's global address, which has no route from here.
+export AWS_DEFAULT_REGION=${region}
+
+until docker info >/dev/null 2>&1; do sleep 5; done
+until mountpoint -q /opt/dlami/nvme; do sleep 5; done
+
+aws ecr get-login-password | docker login --username AWS --password-stdin ${registry}
+docker pull -q "$VLLM_IMAGE"
+docker pull -q "$COLLECTOR_IMAGE"
+
+mkdir -p "$MODEL_DIR"
+aws s3 sync "s3://${bucket}/models/$MODEL_REPO/$MODEL_REVISION" "$MODEL_DIR" --only-show-errors
+
+cat > /etc/otel-collector.yaml <<'EOF'
+${collector_config}
+EOF
+docker run -d --name collector --network host \
+  -v /etc/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro \
+  "$COLLECTOR_IMAGE"
+
+docker run -d --name vllm --network host --gpus all \
+  -v "$MODEL_DIR:/models/Qwen3-8B:ro" \
+  -e HF_HUB_OFFLINE=1 \
+  -e OTEL_SERVICE_NAME=vllm \
+  "$VLLM_IMAGE" \
+  /models/Qwen3-8B --served-model-name "$MODEL_REPO" \
+  --host 0.0.0.0 --port "$PORT" \
+  --enable-auto-tool-choice --tool-call-parser hermes \
+  --max-model-len 16384 \
+  --enable-per-request-metrics --enable-prompt-tokens-details \
+  --otlp-traces-endpoint http://127.0.0.1:4317
+
+until curl -sf "http://127.0.0.1:$PORT/health" >/dev/null; do sleep 5; done
+touch /opt/ready

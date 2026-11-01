@@ -27,19 +27,31 @@ resource "aws_route_table_association" "private" {
   route_table_id = aws_route_table.private.id
 }
 
-# Free. AgentCore pulls container image layers from S3 (ECR stores them
-# there). Scoped to that bucket only, as the AgentCore docs recommend.
+# Free. AgentCore and the GPU server pull container image layers from S3 (ECR
+# stores them there), scoped to that bucket as the AgentCore docs recommend. The
+# GPU server also takes the weights from the artifacts bucket.
 resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.main.id
   service_name      = "com.amazonaws.${var.region}.s3"
   vpc_endpoint_type = "Gateway"
   route_table_ids   = [aws_route_table.private.id]
   policy = jsonencode({
-    Statement = [{
-      Effect    = "Allow"
-      Principal = "*"
-      Action    = ["s3:GetObject"]
-      Resource  = ["arn:aws:s3:::prod-${var.region}-starport-layer-bucket/*"]
-    }]
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = ["s3:GetObject"]
+        Resource = [
+          "arn:aws:s3:::prod-${var.region}-starport-layer-bucket/*",
+          "arn:aws:s3:::${local.artifacts_bucket}/*",
+        ]
+      },
+      {
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = ["s3:ListBucket"]
+        Resource  = ["arn:aws:s3:::${local.artifacts_bucket}"]
+      },
+    ]
   })
 }
