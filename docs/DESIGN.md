@@ -72,6 +72,7 @@
 | [system/serving/otel-collector.yaml](../system/serving/otel-collector.yaml) | Collectorの設定(§1) | ✅ |
 | [system/llm/](../system/llm/) | OpenAI互換クライアント。ストリーミングで受け、chat spanにTTFTとエンジンの内訳(llama.cppの`timings`、vLLMの`metrics`)を記録する。断片で届くツール呼び出しを組み立てる。HTTPヘッダに`traceparent`を載せる | ✅ |
 | [system/agent.py](../system/agent.py) | エージェントループ(§1の「エージェントの基本形」) | ✅ |
+| [system/agent_server.py](../system/agent_server.py)・[Dockerfile.agent](../Dockerfile.agent) | エージェントのHTTPの入口(AgentCore Runtimeの決まりに合わせ、ポート8080の`GET /ping`と`POST /invocations`)。受け取った`traceparent`のトレースに入り、セッションIDを`gen_ai.conversation.id`に記録する。接続先は環境変数で渡す。Runtimeに置いて確かめるのはこれから(イメージも未ビルド) | 🟡 |
 | [infra/](../infra/) | Terraform(VPC・RDS・踏み台・AgentCore Runtime・基盤側のspanの配送)。`infra/account/`はTransaction Search。`infra/artifacts/`はvLLMとCollectorのイメージ(ECR)と重み(S3)の置き場で、段階ごとに消さない | ✅ |
 | `docs/runbook.md`・`traces/` | 手順書と根拠のトレース | ⬜ |
 
@@ -218,7 +219,10 @@
   - [x] vLLMの応答の内訳をchat spanに記録する(2026-11-01)。ストリーミングでは最後のチャンクの`metrics`
     (`queue_time_ms`・`time_to_first_token_ms`・`generation_time_ms`・`mean_itl_ms`・`tokens_per_second`)と`usage.prompt_tokens_details.cached_tokens`にある。
     テストは偽の応答で、形は仮のGPUサーバの実際の応答に合わせた。実機でspanに載ることはGPUのEC2を置いたときに確かめる。
-    spanの`gen_ai.provider.name`は`llama.cpp`固定のままなので、エージェントをRuntimeへ移すときに接続先の既定値と一緒に直す
+    spanの`gen_ai.provider.name`は`LlmClient`の引数で変えられるようにした(2026-11-01。既定は`llama.cpp`、Runtimeでは環境変数`LLM_PROVIDER`で渡す)
+  - [x] エージェントのHTTPの入口(2026-11-01、`system/agent_server.py`)。手元で本物のMCPサーバと偽のLLMにつなぎ、送った`traceparent`のトレースIDで`chat`とツール呼び出しがつながることを確かめた。
+    MCPの接続は起動時に1本つなぐので、そのときの`server/discover`は質問のトレースに入らず、別のトレースになる
+  - [ ] エージェントをRuntimeに置く(Terraform、ARM64イメージ)。`agent → chat → vLLM`と`agent → 基盤のspan → MCPサーバ → RDS`が1本のトレースになることを確かめる
   - [x] エンジンの起動フラグ: `--enable-per-request-metrics`・`--enable-prompt-tokens-details`(2026-10-31、応答に内訳が入ることを確認)。vLLMの`time_to_first_token_ms`は
     待ち行列の時間を含まないので、クライアント側のTTFTとは別の名前で記録する。Prometheusの`/metrics`はCloudWatchに送らず、
     事例の前後で保存する

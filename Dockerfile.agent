@@ -1,0 +1,16 @@
+# The agent's image for AgentCore Runtime, which runs linux/arm64 containers and
+# sends HTTP invocations to port 8080.
+#   docker buildx build --platform linux/arm64 -f Dockerfile.agent -t agent-latency-tracer/agent .
+FROM python:3.14-slim
+
+WORKDIR /app
+COPY pyproject.toml ./
+COPY system/ system/
+COPY tracing/ tracing/
+# aws: SigV4 to the MCP server's Runtime, and sending spans to CloudWatch.
+RUN pip install --no-cache-dir ".[aws]"
+
+ENV AGENT_SERVER_HOST=0.0.0.0 \
+    TRACE_TO=cloudwatch
+EXPOSE 8080
+CMD ["python", "-m", "system.agent_server"]

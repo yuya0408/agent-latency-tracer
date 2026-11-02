@@ -16,28 +16,13 @@ import os
 import uvicorn
 from opentelemetry import trace
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware as HttpSpanMiddleware
-from opentelemetry.sdk.trace.export import SpanExporter
 
 from system.mcp_server.server import DEFAULT_CORPUS_N, build_server
-from tracing.exporter import SQLiteSpanExporter
+from tracing.exporter import exporters_from_env
 from tracing.instrumentation import build_tracer_provider
 
 HOST = os.environ.get("MCP_SERVER_HOST", "127.0.0.1")
 PORT = 8000  # AgentCore Runtime expects MCP servers on 8000, path /mcp
-
-
-def _exporters() -> list[SpanExporter]:
-    exporters: list[SpanExporter] = []
-    for name in os.environ.get("TRACE_TO", "sqlite").split(","):
-        if name == "sqlite":
-            exporters.append(SQLiteSpanExporter(os.environ.get("TRACE_DB", "traces.db")))
-        elif name == "cloudwatch":
-            from tracing.aws_exporter import cloudwatch_span_exporter  # needs the "aws" extra
-
-            exporters.append(cloudwatch_span_exporter())
-        else:
-            raise ValueError(f"unknown TRACE_TO destination: {name}")
-    return exporters
 
 
 def main() -> None:
@@ -45,7 +30,7 @@ def main() -> None:
     provider = None
     if otel:
         # The SDK's middleware uses the global tracer provider, so register ours there.
-        provider = build_tracer_provider(*_exporters(), service_name="mcp-server", batch=True)
+        provider = build_tracer_provider(*exporters_from_env(), service_name="mcp-server", batch=True)
         trace.set_tracer_provider(provider)
     server = build_server(
         otel=otel,
