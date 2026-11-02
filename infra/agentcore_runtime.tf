@@ -60,6 +60,11 @@ resource "aws_bedrockagentcore_agent_runtime" "mcp_server" {
   depends_on = [aws_iam_role_policy.agentcore_runtime, aws_iam_role_policy.agentcore_runtime_rds]
 }
 
+locals {
+  # Where an MCP client connects (the runtime ARN goes in URL-encoded).
+  mcp_server_url = "https://bedrock-agentcore.${var.region}.amazonaws.com/runtimes/${urlencode(aws_bedrockagentcore_agent_runtime.mcp_server.agent_runtime_arn)}/invocations?qualifier=DEFAULT"
+}
+
 # Turning on the runtime's tracing (the console's "Tracing" switch): its
 # TRACES delivered to X-Ray, which puts them in aws/spans.
 resource "aws_cloudwatch_log_delivery_source" "runtime_traces" {

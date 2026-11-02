@@ -1,7 +1,7 @@
 # The inference server: vLLM on a GPU, inside the VPC. Boots into serving with
-# the images and weights from ../artifacts/ (gpu_boot.sh.tftpl). No inbound rules
-# yet: nothing in the VPC calls it until the agent moves to a Runtime. About
-# $1.17 an hour, so destroy it after each session.
+# the images and weights from ../artifacts/ (gpu_boot.sh.tftpl). Only the agent's
+# runtime calls it (agentcore_agent.tf). About $1.17 an hour, so destroy it after
+# each session.
 
 locals {
   artifacts_bucket = "agent-latency-tracer-artifacts-${local.account_id}"
