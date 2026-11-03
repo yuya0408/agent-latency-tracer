@@ -12,6 +12,7 @@ Environment variables:
   MCP_SERVER_URL     MCP server (default http://127.0.0.1:8000/mcp)
   TRACE_TO, TRACE_DB where the spans go (tracing.exporter.exporters_from_env)
   AGENT_SERVER_HOST  address to listen on (default "127.0.0.1"; the container sets "0.0.0.0")
+  PITFALLS           cases switched on in the agent (system/pitfalls.py)
 """
 from __future__ import annotations
 import os
@@ -25,6 +26,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
+from system import pitfalls
 from system.agent import Agent
 from system.llm.client import DEFAULT_BASE_URL, DEFAULT_MODEL, DEFAULT_PROVIDER_NAME, LlmClient
 from system.mcp_client import McpToolClient
@@ -60,7 +62,9 @@ async def invocations(request: Request) -> JSONResponse:
 
 @asynccontextmanager
 async def lifespan(app: Starlette) -> AsyncIterator[None]:
-    provider = build_tracer_provider(*exporters_from_env(), service_name="agent", batch=True)
+    provider = build_tracer_provider(
+        *exporters_from_env(), service_name="agent", batch=True, resource_attributes=pitfalls.resource_attributes()
+    )
     set_global_tracer_provider(provider)
     tracer = get_tracer(provider)
     llm = LlmClient(

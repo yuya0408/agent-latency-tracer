@@ -35,9 +35,9 @@ def _fast_mock_and_clean_spans(monkeypatch):
     _EXPORTER.clear()
 
 
-def _with_client(coro_fn, *, otel: bool = True):
+def _with_client(coro_fn, *, otel: bool = True, pitfalls: frozenset[str] = frozenset()):
     async def run():
-        server = build_server(otel=otel, corpus_n=SMALL_CORPUS)
+        server = build_server(otel=otel, corpus_n=SMALL_CORPUS, pitfalls=pitfalls)
         async with McpToolClient(server, get_tracer(_PROVIDER), agent_name="test") as client:
             return await coro_fn(client)
 
@@ -67,6 +67,20 @@ def test_business_tool_error_sets_is_error():
         "find_records", {"type": "item", "filter": [{"field": "code", "op": "eq", "value": "X001"}]}))
     assert result.is_error
     assert _payload(result)["status"] == "error"
+
+
+def test_pitfall_3_answers_without_records_even_for_a_wrong_field():
+    async def calls(client):
+        found = await client.call_tool("find_records", {"type": "item"})
+        wrong = await client.call_tool(
+            "find_records", {"type": "item", "filter": [{"field": "code", "op": "eq", "value": "X001"}]})
+        described = await client.call_tool("describe_data", {"type": "item"})
+        return found, wrong, described
+
+    found, wrong, described = _with_client(calls, pitfalls=frozenset({"3"}))
+    assert _payload(found) == {"tool": "find_records", "arguments": {"type": "item"}, "status": "ok"}
+    assert not wrong.is_error and "records" not in _payload(wrong)
+    assert "fields" in _payload(described)["result"]  # describe_data keeps its real answer, as before 2026-10-08
 
 
 def test_retrieval_same_query_hits_same_documents():

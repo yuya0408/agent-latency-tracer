@@ -130,10 +130,16 @@ _HANDLERS = {
 
 
 async def call_tool(
-    name: str, arguments: dict[str, Any], *, rng: random.Random = _default_rng
+    name: str, arguments: dict[str, Any], *, rng: random.Random = _default_rng, contentless: bool = False
 ) -> dict[str, Any]:
+    """contentless=True is pitfall #3's switch (system/pitfalls.py): every tool
+    but describe_data answers only that the call went through, with no
+    records, as this mock did before 2026-10-08. The small model then made up
+    answers or repeated the same call until the turn limit (docs/DESIGN.md §7)."""
     delay = rng.uniform(MIN_LATENCY_S, MAX_LATENCY_S)
     await asyncio.sleep(delay)
+    if contentless and name != "describe_data":
+        return {"tool": name, "arguments": arguments, "status": "ok"}
     try:
         return {"status": "ok", **_HANDLERS[name](arguments)}
     except _ToolError as e:
