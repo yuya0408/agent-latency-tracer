@@ -9,6 +9,7 @@ Environment variables:
   MCP_SERVER_HOST  address to listen on (default "127.0.0.1"; the container sets "0.0.0.0")
   RETRIEVAL_BACKEND  "faiss" (default) or "pgvector"; pgvector reads PGHOST, PGUSER, ... like libpq
   RDS_IAM_AUTH     "1": log in to RDS with an IAM token instead of PGPASSWORD (needs the "aws" extra)
+  PITFALLS         cases switched on in the server (system/pitfalls.py)
 """
 from __future__ import annotations
 import os
@@ -17,6 +18,7 @@ import uvicorn
 from opentelemetry import trace
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware as HttpSpanMiddleware
 
+from system import pitfalls
 from system.mcp_server.server import DEFAULT_CORPUS_N, build_server
 from tracing.exporter import exporters_from_env
 from tracing.instrumentation import build_tracer_provider
@@ -30,12 +32,18 @@ def main() -> None:
     provider = None
     if otel:
         # The SDK's middleware uses the global tracer provider, so register ours there.
-        provider = build_tracer_provider(*exporters_from_env(), service_name="mcp-server", batch=True)
+        provider = build_tracer_provider(
+            *exporters_from_env(),
+            service_name="mcp-server",
+            batch=True,
+            resource_attributes=pitfalls.resource_attributes(),
+        )
         trace.set_tracer_provider(provider)
     server = build_server(
         otel=otel,
         corpus_n=int(os.environ.get("CORPUS_N", DEFAULT_CORPUS_N)),
         retrieval=os.environ.get("RETRIEVAL_BACKEND", "faiss"),
+        pitfalls=pitfalls.enabled(),
     )
     # Stateless, as AgentCore Runtime recommends: no per-session state kept in
     # the server, so any request can go to any instance.

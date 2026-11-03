@@ -80,9 +80,15 @@ BATCH_EXPORT_INTERVAL_MS = 500
 
 
 def build_tracer_provider(
-    *exporters: SpanExporter, service_name: str = "agent-latency-tracer", batch: bool = False
+    *exporters: SpanExporter,
+    service_name: str = "agent-latency-tracer",
+    batch: bool = False,
+    resource_attributes: Mapping[str, Any] | None = None,
 ) -> TracerProvider:
     """Wire one or more exporters to a new provider, each behind its own processor.
+
+    resource_attributes go on every span alongside service.name (e.g. which
+    pitfalls the process runs with, system/pitfalls.py).
 
     One processor per exporter, so a slow destination (CloudWatch: signing and
     an HTTPS round trip per batch) doesn't hold up the others; with batch=True
@@ -107,7 +113,8 @@ def build_tracer_provider(
     # in the index; with the SDK's random IDs it says the trace has expired
     # (docs/DESIGN.md §5). Still valid W3C IDs, so SQLite and the viewer don't care.
     provider = TracerProvider(
-        resource=Resource.create({"service.name": service_name}), id_generator=AwsXRayIdGenerator()
+        resource=Resource.create({**(resource_attributes or {}), "service.name": service_name}),
+        id_generator=AwsXRayIdGenerator(),
     )
     for exporter in exporters:
         if batch:

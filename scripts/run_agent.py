@@ -11,6 +11,8 @@ processes write spans to the same SQLite file (TRACE_DB, default
 "traces.db"), so the server's spans land in the same trace as the agent's.
 --cloudwatch needs the "aws" extra and AWS credentials, and Transaction
 Search on in the account (infra/account/). Only the agent's spans go there.
+PITFALLS switches cases on in the agent (system/pitfalls.py); the server
+reads its own.
 """
 from __future__ import annotations
 import argparse, asyncio, json, os, sys, time
@@ -18,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from system import pitfalls
 from system.agent import Agent
 from system.llm.client import LlmClient
 from system.mcp_client import McpToolClient
@@ -62,7 +65,9 @@ async def main(numbers: list[int], cloudwatch: bool) -> None:
         # Imported here so the script runs without the "aws" extra.
         from tracing.aws_exporter import cloudwatch_span_exporter
         exporters.append(cloudwatch_span_exporter())
-    provider = build_tracer_provider(*exporters, service_name="agent", batch=True)
+    provider = build_tracer_provider(
+        *exporters, service_name="agent", batch=True, resource_attributes=pitfalls.resource_attributes()
+    )
     set_global_tracer_provider(provider)
     tracer = get_tracer(provider)
 
