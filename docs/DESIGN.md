@@ -376,3 +376,6 @@
     また、Runtimeを消した後も、AgentCoreが作ったネットワークインターフェース(`agentic_ai`型)がRuntimeのSGをつかんだまま残り、
     SG・サブネット・VPCを消せなかった。公式には、Runtimeを消した後もネットワークインターフェースが最大8時間残る。
     時間をおいてdestroyし直す(どれも無料)
+  - AgentCoreはRuntimeごとにロググループ(`/aws/bedrock-agentcore/runtimes/<RuntimeのID>-DEFAULT`)を作る。保持期間は無期限で、
+    Terraformの外なのでRuntimeを消しても残る(2026-11-03に3つ・約310KBを確認)。名前にRuntimeのIDが入り、作る前に決まらないので、
+    destroyの後に`aws logs delete-log-group`で消す
