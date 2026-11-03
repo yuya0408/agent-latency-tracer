@@ -1,6 +1,6 @@
 # The MCP server on AgentCore Runtime (stage 5), plus delivery of the
-# platform's own spans (InvokeAgentRuntime). The image has to be in ECR
-# before this is created: apply the repository first, push, then the rest.
+# platform's own spans (InvokeAgentRuntime). The image has to be pushed to its
+# repository in ../artifacts/ before this is created.
 
 variable "mcp_server_image_tag" {
   type    = string
@@ -13,7 +13,7 @@ resource "aws_bedrockagentcore_agent_runtime" "mcp_server" {
 
   agent_runtime_artifact {
     container_configuration {
-      container_uri = "${aws_ecr_repository.mcp_server.repository_url}:${var.mcp_server_image_tag}"
+      container_uri = "${data.aws_ecr_repository.mcp_server.repository_url}:${var.mcp_server_image_tag}"
     }
   }
 

@@ -74,7 +74,7 @@
 | [system/agent.py](../system/agent.py) | エージェントループ(§1の「エージェントの基本形」) | ✅ |
 | [system/agent_server.py](../system/agent_server.py)・[Dockerfile.agent](../Dockerfile.agent) | エージェントのHTTPの入口(AgentCore Runtimeの決まりに合わせ、ポート8080の`GET /ping`と`POST /invocations`)。受け取った`traceparent`のトレースに入り、セッションIDを`gen_ai.conversation.id`に記録する。接続先は環境変数で渡す。Runtimeは`infra/agentcore_agent.tf` | ✅ |
 | [scripts/invoke_agent.py](../scripts/invoke_agent.py) | 利用者役。Runtime上のエージェントに仮の質問を`InvokeAgentRuntime`で投げ、自分のspanの`traceparent`を付ける。質問ごとに新しいセッション | ✅ |
-| [infra/](../infra/) | Terraform(VPC・RDS・踏み台・AgentCore Runtime・基盤側のspanの配送)。`infra/account/`はTransaction Search。`infra/artifacts/`はvLLMとCollectorのイメージ(ECR)と重み(S3)の置き場で、段階ごとに消さない | ✅ |
+| [infra/](../infra/) | Terraform(VPC・RDS・踏み台・AgentCore Runtime・基盤側のspanの配送)。`infra/account/`はTransaction Search。`infra/artifacts/`はイメージ(ECR。vLLM・Collector・MCPサーバ・エージェント)と重み(S3)の置き場で、段階ごとに消さない | ✅ |
 | `docs/runbook.md`・`traces/` | 手順書と根拠のトレース | ⬜ |
 
 ## 4. span設計

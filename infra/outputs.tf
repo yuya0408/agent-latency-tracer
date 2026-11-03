@@ -10,10 +10,6 @@ output "bastion_instance_id" {
   value = aws_instance.bastion.id
 }
 
-output "ecr_repository_url" {
-  value = aws_ecr_repository.mcp_server.repository_url
-}
-
 output "mcp_server_url" {
   value = local.mcp_server_url
 }
