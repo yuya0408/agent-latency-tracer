@@ -72,7 +72,8 @@
 | [system/serving/otel-collector.yaml](../system/serving/otel-collector.yaml) | Collectorの設定(§1) | ✅ |
 | [system/llm/](../system/llm/) | OpenAI互換クライアント。ストリーミングで受け、chat spanにTTFTとエンジンの内訳(llama.cppの`timings`、vLLMの`metrics`)を記録する。断片で届くツール呼び出しを組み立てる。HTTPヘッダに`traceparent`を載せる | ✅ |
 | [system/agent.py](../system/agent.py) | エージェントループ(§1の「エージェントの基本形」) | ✅ |
-| [system/agent_server.py](../system/agent_server.py)・[Dockerfile.agent](../Dockerfile.agent) | エージェントのHTTPの入口(AgentCore Runtimeの決まりに合わせ、ポート8080の`GET /ping`と`POST /invocations`)。受け取った`traceparent`のトレースに入り、セッションIDを`gen_ai.conversation.id`に記録する。接続先は環境変数で渡す。Runtimeに置いて確かめるのはこれから(イメージも未ビルド) | 🟡 |
+| [system/agent_server.py](../system/agent_server.py)・[Dockerfile.agent](../Dockerfile.agent) | エージェントのHTTPの入口(AgentCore Runtimeの決まりに合わせ、ポート8080の`GET /ping`と`POST /invocations`)。受け取った`traceparent`のトレースに入り、セッションIDを`gen_ai.conversation.id`に記録する。接続先は環境変数で渡す。Runtimeは`infra/agentcore_agent.tf` | ✅ |
+| [scripts/invoke_agent.py](../scripts/invoke_agent.py) | 利用者役。Runtime上のエージェントに仮の質問を`InvokeAgentRuntime`で投げ、自分のspanの`traceparent`を付ける。質問ごとに新しいセッション | ✅ |
 | [infra/](../infra/) | Terraform(VPC・RDS・踏み台・AgentCore Runtime・基盤側のspanの配送)。`infra/account/`はTransaction Search。`infra/artifacts/`はvLLMとCollectorのイメージ(ECR)と重み(S3)の置き場で、段階ごとに消さない | ✅ |
 | `docs/runbook.md`・`traces/` | 手順書と根拠のトレース | ⬜ |
 
@@ -203,7 +204,7 @@
     ログインし、SSLは`verify-full`。`SELECT documents`のspanが`tools/call retrieve_documents`の子として同じトレースに入った
   - [x] トレースIDをX-Ray形式にする(2026-10-31。`build_tracer_provider`で`AwsXRayIdGenerator`を使う)。画面の見方は§5。
     基盤側のspanがこのIDを引き継いで1本のトレースのままになるかは、5bでRuntimeを立てたときに確かめる
-- [ ] 5b. GPUのEC2(vLLM＋Qwen3-8B、§1)を同じVPCに置き、エージェントをAgentCore Runtimeに移す。
+- [x] 5b. GPUのEC2(vLLM＋Qwen3-8B、§1)を同じVPCに置き、エージェントをAgentCore Runtimeに移す(2026-11-03に完了)。
   GPUのTerraformは`toolcall-serving-bench`のものを元にする(g6.xlargeは1時間約$1.17、月60ドルの予算は同じアカウントで分け合う)。
   `toolcall-serving-bench`は2026-10-30に終えた。作る前に決めること・作ること:
   - [x] エージェントからLLMへの呼び出しに`traceparent`を付ける(2026-10-31。親は`chat` span。エンジンが実際に引き継ぐかは5bで確かめる)
@@ -222,7 +223,14 @@
     spanの`gen_ai.provider.name`は`LlmClient`の引数で変えられるようにした(2026-11-01。既定は`llama.cpp`、Runtimeでは環境変数`LLM_PROVIDER`で渡す)
   - [x] エージェントのHTTPの入口(2026-11-01、`system/agent_server.py`)。手元で本物のMCPサーバと偽のLLMにつなぎ、送った`traceparent`のトレースIDで`chat`とツール呼び出しがつながることを確かめた。
     MCPの接続は起動時に1本つなぐので、そのときの`server/discover`は質問のトレースに入らず、別のトレースになる
-  - [ ] エージェントをRuntimeに置く(Terraform、ARM64イメージ)。`agent → chat → vLLM`と`agent → 基盤のspan → MCPサーバ → RDS`が1本のトレースになることを確かめる
+  - [x] エージェントをRuntimeに置く(2026-11-03、`infra/agentcore_agent.tf`)。MCPサーバとは別のRuntimeで、ロールは自分のイメージの取得とMCPサーバのRuntimeの呼び出しだけ(RDSの権限は無い)。
+    VPCの中からMCPサーバのRuntimeを呼ぶため、`bedrock-agentcore`のエンドポイントを足した。vLLMへはエージェントのSGからだけポート8000を開ける。
+    利用者役の`scripts/invoke_agent.py`から仮の質問2と6を呼び、1本のトレースに次が並んだ(X-Ray形式のIDを基盤側のspanも引き継いだ):
+    `InvokeAgentRuntime`(手元) → `AgentCore.Runtime.Invoke`(エージェントの基盤) → `invoke_agent` → `chat` → `llm_request`(vLLM)、
+    `invoke_agent` → `execute_tool` → `MCP send` → `AgentCore.Runtime.Invoke`(MCPサーバの基盤) → `POST /mcp` → `tools/call retrieve_documents` → `SELECT documents`。
+    エージェントの基盤のspanの`session.id`は、`invoke_agent`の`gen_ai.conversation.id`と同じ値になった。
+    手元のspanの上に、CloudWatchが`InternalOperation`(サービスは`caller`)を付けた。手元にはこの名前のspanを作るコードが無く、
+    親の無いspanの上にだけ現れる(2026-10-31の、親の無い`chat`の上に出たものと同じ)。トレースの根が1段増えるだけで、つながりには影響しない
   - [x] エンジンの起動フラグ: `--enable-per-request-metrics`・`--enable-prompt-tokens-details`(2026-10-31、応答に内訳が入ることを確認)。vLLMの`time_to_first_token_ms`は
     待ち行列の時間を含まないので、クライアント側のTTFTとは別の名前で記録する。Prometheusの`/metrics`はCloudWatchに送らず、
     事例の前後で保存する
@@ -260,7 +268,10 @@
    同じ集計を繰り返して打ち切りになったりした。「0件」と分かる形で返すと止まる。往復の回数がそのまま遅延になる
 5. **小さいLLMの項目の選び間違いが、往復を増やす。** `describe_data`で項目を調べた後でも、取引先IDの項目に名前を入れる、
    品目コードを`code`で探す、在庫を品目マスタで探す、といった誤りがあった。知らない項目名にはエラーで使える項目名を返す。
-   エージェントループでも、取引先IDの項目に「A」「A社」を入れて0件になった(2026-10-11)
+   エージェントループでも、取引先IDの項目に「A」「A社」を入れて0件になった(2026-10-11)。
+   Qwen3-8B(vLLM)でも起きた(2026-11-03、仮の質問2)。1回目の呼び出しで、`describe_data`と同時に`find_records`を2回、
+   項目名を推測して(答えに出てきた名前は`partner`・`shipment_status`・`item`)呼んだ。その結果を読んだ2回目の呼び出しは、
+   「項目名を変えて再検索します」と書いただけでツールを呼ばずに終わり、答えにならなかった
 6. **最初の1問だけ、LLMの読み込みが極端に遅い。** コンテナを4日間放置した後の最初のリクエストで、21トークンの読み込みに
    10.1秒かかった(次の質問からは同じ量で約0.7秒)。モデルのデータがメモリから追い出されていたためと推測しているが、
    確かめていない。chat spanの`llamacpp.prompt_ms`と`prompt_n`の比で見つかる

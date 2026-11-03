@@ -17,9 +17,8 @@ resource "aws_ecr_repository" "mcp_server" {
   force_delete = true # destroy removes pushed images too
 }
 
-resource "aws_iam_role" "agentcore_runtime" {
-  name = "agent-latency-tracer-agentcore-runtime"
-  assume_role_policy = jsonencode({
+locals {
+  runtime_assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect    = "Allow"
@@ -31,70 +30,77 @@ resource "aws_iam_role" "agentcore_runtime" {
       }
     }]
   })
+
+  # The execution role in the AgentCore docs, narrowed to this project and with
+  # no Bedrock model access (the LLM is self-hosted). Each runtime adds ECR
+  # access to its own repository.
+  runtime_common_statements = [
+    {
+      Effect   = "Allow"
+      Action   = ["ecr:GetAuthorizationToken"]
+      Resource = "*"
+    },
+    {
+      Effect   = "Allow"
+      Action   = ["logs:DescribeLogStreams", "logs:CreateLogGroup"]
+      Resource = ["arn:aws:logs:${var.region}:${local.account_id}:log-group:/aws/bedrock-agentcore/runtimes/*"]
+    },
+    {
+      Effect   = "Allow"
+      Action   = ["logs:DescribeLogGroups"]
+      Resource = ["arn:aws:logs:${var.region}:${local.account_id}:log-group:*"]
+    },
+    {
+      Effect   = "Allow"
+      Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+      Resource = ["arn:aws:logs:${var.region}:${local.account_id}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"]
+    },
+    {
+      Effect   = "Allow"
+      Action   = ["xray:PutTraceSegments", "xray:PutTelemetryRecords", "xray:GetSamplingRules", "xray:GetSamplingTargets"]
+      Resource = "*"
+    },
+    {
+      # The container's own spans, sent over OTLP (tracing/aws_exporter.py).
+      Effect   = "Allow"
+      Action   = "xray:PutSpans"
+      Resource = "*"
+    },
+    {
+      Effect    = "Allow"
+      Action    = "cloudwatch:PutMetricData"
+      Resource  = "*"
+      Condition = { StringEquals = { "cloudwatch:namespace" = "bedrock-agentcore" } }
+    },
+    {
+      Effect = "Allow"
+      Action = [
+        "bedrock-agentcore:GetWorkloadAccessToken",
+        "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
+        "bedrock-agentcore:GetWorkloadAccessTokenForUserId",
+      ]
+      Resource = [
+        "arn:aws:bedrock-agentcore:${var.region}:${local.account_id}:workload-identity-directory/default",
+        "arn:aws:bedrock-agentcore:${var.region}:${local.account_id}:workload-identity-directory/default/workload-identity/${local.runtime_prefix}*",
+      ]
+    },
+  ]
 }
 
-# The execution role in the AgentCore docs, narrowed to this project: ECR to
-# this repository only, and no Bedrock model access (the LLM is self-hosted).
+resource "aws_iam_role" "agentcore_runtime" {
+  name               = "agent-latency-tracer-agentcore-runtime"
+  assume_role_policy = local.runtime_assume_role_policy
+}
+
 resource "aws_iam_role_policy" "agentcore_runtime" {
   role = aws_iam_role.agentcore_runtime.id
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"]
-        Resource = [aws_ecr_repository.mcp_server.arn]
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["ecr:GetAuthorizationToken"]
-        Resource = "*"
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["logs:DescribeLogStreams", "logs:CreateLogGroup"]
-        Resource = ["arn:aws:logs:${var.region}:${local.account_id}:log-group:/aws/bedrock-agentcore/runtimes/*"]
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["logs:DescribeLogGroups"]
-        Resource = ["arn:aws:logs:${var.region}:${local.account_id}:log-group:*"]
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["logs:CreateLogStream", "logs:PutLogEvents"]
-        Resource = ["arn:aws:logs:${var.region}:${local.account_id}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"]
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["xray:PutTraceSegments", "xray:PutTelemetryRecords", "xray:GetSamplingRules", "xray:GetSamplingTargets"]
-        Resource = "*"
-      },
-      {
-        # The server's own spans, sent over OTLP (tracing/aws_exporter.py).
-        Effect   = "Allow"
-        Action   = "xray:PutSpans"
-        Resource = "*"
-      },
-      {
-        Effect    = "Allow"
-        Action    = "cloudwatch:PutMetricData"
-        Resource  = "*"
-        Condition = { StringEquals = { "cloudwatch:namespace" = "bedrock-agentcore" } }
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "bedrock-agentcore:GetWorkloadAccessToken",
-          "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
-          "bedrock-agentcore:GetWorkloadAccessTokenForUserId",
-        ]
-        Resource = [
-          "arn:aws:bedrock-agentcore:${var.region}:${local.account_id}:workload-identity-directory/default",
-          "arn:aws:bedrock-agentcore:${var.region}:${local.account_id}:workload-identity-directory/default/workload-identity/${local.runtime_prefix}*",
-        ]
-      },
-    ]
+    Statement = concat([{
+      Effect   = "Allow"
+      Action   = ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"]
+      Resource = [aws_ecr_repository.mcp_server.arn]
+    }], local.runtime_common_statements)
   })
 }
 
