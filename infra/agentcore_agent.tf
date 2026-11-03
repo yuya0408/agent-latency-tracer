@@ -1,16 +1,15 @@
 # The agent on its own AgentCore Runtime (stage 5b), separate from the MCP
 # server's: it calls the vLLM server (gpu.tf) inside the VPC and the MCP server
-# through the AgentCore API. Like the MCP server, the image has to be in ECR
-# before the runtime is created: apply the repository first, push, then the rest.
+# through the AgentCore API. Like the MCP server, the image has to be pushed to
+# its repository in ../artifacts/ before the runtime is created.
 
 variable "agent_image_tag" {
   type    = string
   default = "latest"
 }
 
-resource "aws_ecr_repository" "agent" {
-  name         = "agent-latency-tracer/agent"
-  force_delete = true # destroy removes pushed images too
+data "aws_ecr_repository" "agent" {
+  name = "agent-latency-tracer/agent"
 }
 
 resource "aws_iam_role" "agent_runtime" {
@@ -27,7 +26,7 @@ resource "aws_iam_role_policy" "agent_runtime" {
       {
         Effect   = "Allow"
         Action   = ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"]
-        Resource = [aws_ecr_repository.agent.arn]
+        Resource = [data.aws_ecr_repository.agent.arn]
       },
       {
         Effect = "Allow"
@@ -94,7 +93,7 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
 
   agent_runtime_artifact {
     container_configuration {
-      container_uri = "${aws_ecr_repository.agent.repository_url}:${var.agent_image_tag}"
+      container_uri = "${data.aws_ecr_repository.agent.repository_url}:${var.agent_image_tag}"
     }
   }
 
@@ -144,10 +143,6 @@ resource "aws_cloudwatch_log_delivery_source" "agent_runtime_traces" {
 resource "aws_cloudwatch_log_delivery" "agent_runtime_traces" {
   delivery_source_name     = aws_cloudwatch_log_delivery_source.agent_runtime_traces.name
   delivery_destination_arn = aws_cloudwatch_log_delivery_destination.xray.arn
-}
-
-output "agent_ecr_repository_url" {
-  value = aws_ecr_repository.agent.repository_url
 }
 
 output "agent_runtime_arn" {

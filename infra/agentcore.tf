@@ -1,6 +1,6 @@
-# The receiving side for AgentCore Runtime: the image repository, the role the
-# runtime runs as, and its security group. The runtime itself is created with
-# the MCP server's image in stage 5 (docs/DESIGN.md §6).
+# The receiving side for AgentCore Runtime: the role the runtime runs as and
+# its security group (the image repository is in ../artifacts/). The runtime
+# itself is created with the MCP server's image in stage 5 (docs/DESIGN.md §6).
 
 data "aws_caller_identity" "current" {}
 
@@ -12,9 +12,8 @@ locals {
   mcp_server_db_user = "mcp_server"
 }
 
-resource "aws_ecr_repository" "mcp_server" {
-  name         = "agent-latency-tracer/mcp-server"
-  force_delete = true # destroy removes pushed images too
+data "aws_ecr_repository" "mcp_server" {
+  name = "agent-latency-tracer/mcp-server"
 }
 
 locals {
@@ -99,7 +98,7 @@ resource "aws_iam_role_policy" "agentcore_runtime" {
     Statement = concat([{
       Effect   = "Allow"
       Action   = ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"]
-      Resource = [aws_ecr_repository.mcp_server.arn]
+      Resource = [data.aws_ecr_repository.mcp_server.arn]
     }], local.runtime_common_statements)
   })
 }

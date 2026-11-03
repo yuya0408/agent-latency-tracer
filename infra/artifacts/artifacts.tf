@@ -1,6 +1,7 @@
-# What the GPU server takes from inside the VPC, which has no way out to the
-# internet: the weights (S3) and the images (ECR). Kept apart from ../ because
-# that is destroyed after each stage, and moving these again takes a GPU server.
+# What the VPC, which has no way out to the internet, takes from inside: the
+# weights (S3) and the images (ECR). Kept apart from ../ because that is
+# destroyed after each stage. Moving vLLM and the weights again takes a GPU
+# server, and the MCP server and agent images take a build and push each.
 
 data "aws_caller_identity" "current" {}
 
@@ -29,6 +30,16 @@ resource "aws_ecr_repository" "otel_collector" {
   force_delete = true
 }
 
+resource "aws_ecr_repository" "mcp_server" {
+  name         = "agent-latency-tracer/mcp-server"
+  force_delete = true
+}
+
+resource "aws_ecr_repository" "agent" {
+  name         = "agent-latency-tracer/agent"
+  force_delete = true
+}
+
 output "artifacts_bucket" {
   value = aws_s3_bucket.artifacts.bucket
 }
@@ -39,4 +50,12 @@ output "vllm_repository_url" {
 
 output "otel_collector_repository_url" {
   value = aws_ecr_repository.otel_collector.repository_url
+}
+
+output "mcp_server_repository_url" {
+  value = aws_ecr_repository.mcp_server.repository_url
+}
+
+output "agent_repository_url" {
+  value = aws_ecr_repository.agent.repository_url
 }
