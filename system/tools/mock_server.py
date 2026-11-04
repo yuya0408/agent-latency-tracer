@@ -11,7 +11,7 @@ not the lookup. Errors say what to do next (e.g. which field names exist),
 so a model that guessed wrong can recover instead of retrying blindly.
 """
 from __future__ import annotations
-import asyncio, json, pathlib, random
+import asyncio, json, pathlib, random, time
 from typing import Any
 
 from system.tools.loader import load_data_schema
@@ -130,14 +130,27 @@ _HANDLERS = {
 
 
 async def call_tool(
-    name: str, arguments: dict[str, Any], *, rng: random.Random = _default_rng, contentless: bool = False
+    name: str,
+    arguments: dict[str, Any],
+    *,
+    rng: random.Random = _default_rng,
+    contentless: bool = False,
+    blocking: bool = False,
 ) -> dict[str, Any]:
-    """contentless=True is pitfall #3's switch (system/pitfalls.py): every tool
+    """blocking=True is pitfall #2's switch: the wait is time.sleep, which
+    holds the event loop, so the server handles other requests (concurrent
+    tool calls among them) only after it -- the form of a synchronous driver
+    or HTTP client called inside async code.
+
+    contentless=True is pitfall #3's switch (system/pitfalls.py): every tool
     but describe_data answers only that the call went through, with no
     records, as this mock did before 2026-10-08. The small model then made up
     answers or repeated the same call until the turn limit (docs/DESIGN.md §7)."""
     delay = rng.uniform(MIN_LATENCY_S, MAX_LATENCY_S)
-    await asyncio.sleep(delay)
+    if blocking:
+        time.sleep(delay)
+    else:
+        await asyncio.sleep(delay)
     if contentless and name != "describe_data":
         return {"tool": name, "arguments": arguments, "status": "ok"}
     try:

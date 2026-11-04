@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 
 import pytest
 from opentelemetry import trace
@@ -81,6 +82,30 @@ def test_pitfall_3_answers_without_records_even_for_a_wrong_field():
     assert _payload(found) == {"tool": "find_records", "arguments": {"type": "item"}, "status": "ok"}
     assert not wrong.is_error and "records" not in _payload(wrong)
     assert "fields" in _payload(described)["result"]  # describe_data keeps its real answer, as before 2026-10-08
+
+
+def _two_calls_at_once(pitfalls: frozenset[str]) -> float:
+    async def calls(client):
+        start = time.perf_counter()
+        await asyncio.gather(
+            client.call_tool("find_records", {"type": "item"}),
+            client.call_tool("describe_data", {"type": "item"}),
+        )
+        return time.perf_counter() - start
+
+    return _with_client(calls, pitfalls=pitfalls)
+
+
+def test_concurrent_tool_calls_overlap_on_the_server(monkeypatch):
+    monkeypatch.setattr(mock_server, "MIN_LATENCY_S", 0.2)
+    monkeypatch.setattr(mock_server, "MAX_LATENCY_S", 0.2)
+    assert _two_calls_at_once(frozenset()) < 0.35
+
+
+def test_pitfall_2_blocking_wait_serializes_concurrent_tool_calls(monkeypatch):
+    monkeypatch.setattr(mock_server, "MIN_LATENCY_S", 0.2)
+    monkeypatch.setattr(mock_server, "MAX_LATENCY_S", 0.2)
+    assert _two_calls_at_once(frozenset({"2"})) >= 0.4
 
 
 def test_retrieval_same_query_hits_same_documents():
