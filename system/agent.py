@@ -44,12 +44,16 @@ class Agent:
         *,
         name: str = "agent",
         max_turns: int = MAX_TURNS,
+        sequential_tools: bool = False,
     ) -> None:
+        """sequential_tools=True is pitfall #1's switch (system/pitfalls.py):
+        the tool calls from one response are awaited one after another."""
         self._llm = llm
         self._mcp = mcp
         self._tracer = tracer
         self._name = name
         self._max_turns = max_turns
+        self._sequential_tools = sequential_tools
         self._tools: list[dict[str, Any]] | None = None
 
     async def run(self, question: str, *, conversation_id: str | None = None) -> AgentResult:
@@ -63,7 +67,11 @@ class Agent:
                 messages.append(result.as_message())
                 if not result.tool_calls:
                     return AgentResult(result.content, messages, turn, "answer", trace_id)
-                messages.extend(await asyncio.gather(*(self._call_tool(c) for c in result.tool_calls)))
+                if self._sequential_tools:
+                    for c in result.tool_calls:
+                        messages.append(await self._call_tool(c))
+                else:
+                    messages.extend(await asyncio.gather(*(self._call_tool(c) for c in result.tool_calls)))
             mark_error(span, "max_turns_exceeded")
             return AgentResult("", messages, self._max_turns, "max_turns", trace_id)
 

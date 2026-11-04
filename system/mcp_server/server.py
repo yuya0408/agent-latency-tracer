@@ -155,6 +155,7 @@ def build_server(
     """`retrieval` is "faiss" (in-process, `corpus_n` documents) or "pgvector"
     (whatever scripts/load_pgvector.py loaded; `corpus_n` is not used).
     `pitfalls` are the cases switched on in this server (system/pitfalls.py)."""
+    blocking = "2" in pitfalls
     contentless = "3" in pitfalls
     tools = _business_tools()
     business_names = {t.name for t in tools}
@@ -178,7 +179,7 @@ def build_server(
             ids = await retriever.retrieve(ctx, arguments["query"], arguments.get("top_k", DEFAULT_TOP_K))
             return _text_result({"document_ids": ids})
         if params.name in business_names:
-            result = await call_mock_tool(params.name, arguments, contentless=contentless)
+            result = await call_mock_tool(params.name, arguments, contentless=contentless, blocking=blocking)
             return _text_result(result, is_error=result["status"] == "error")
         return _text_result({"error": f"unknown tool: {params.name}"}, is_error=True)
 

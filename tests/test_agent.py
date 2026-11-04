@@ -106,6 +106,20 @@ def test_tool_calls_in_one_response_run_concurrently(monkeypatch):
     assert a.start_time < b.end_time and b.start_time < a.end_time
 
 
+def test_pitfall_1_awaits_tool_calls_one_after_another(monkeypatch):
+    monkeypatch.setattr(mock_server, "MIN_LATENCY_S", 0.2)
+    monkeypatch.setattr(mock_server, "MAX_LATENCY_S", 0.2)
+    llm = ScriptedLlm([
+        _asks(_call("c1", "find_records", {"type": "item"}), _call("c2", "describe_data", {})),
+        _answers("done"),
+    ])
+    _run(llm, ["q"], sequential_tools=True)
+    a, b = sorted(_spans("execute_tool"), key=lambda s: s.start_time)
+    assert a.end_time <= b.start_time
+    # Both results still go back, in the order asked.
+    assert [m["tool_call_id"] for m in llm.requests[1] if m["role"] == "tool"] == ["c1", "c2"]
+
+
 def test_spans_nest_under_one_invoke_agent_span():
     llm = ScriptedLlm([_asks(_call("c1", "find_records", {"type": "item"})), _answers("done")])
     _run(llm, ["q"])
