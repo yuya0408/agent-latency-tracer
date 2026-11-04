@@ -78,7 +78,11 @@ def render_trace_html(db_path: str | Path, trace_id: str) -> str:
     spans = read_trace(db_path, trace_id)
     if not spans:
         raise ValueError(f"no spans found for trace_id={trace_id!r} in {db_path}")
+    return render_spans_html(spans)
 
+
+def render_spans_html(spans: list[dict[str, Any]]) -> str:
+    """The waterfall for one trace's spans, in the dict shape read_trace returns."""
     ordered = _order_spans_depth_first(spans)
     trace_start = min(s["start_time_unix_nano"] for s in spans)
     trace_end = max(s["end_time_unix_nano"] for s in spans)
