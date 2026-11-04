@@ -30,7 +30,7 @@ resource "aws_bedrockagentcore_agent_runtime" "mcp_server" {
     server_protocol = "MCP"
   }
 
-  environment_variables = {
+  environment_variables = merge({
     # Platform spans to the shared aws/spans group, where the agent's and the
     # server's spans already go (new runtimes default to a per-runtime group).
     UNIFIED_TRACES_DESTINATION_ENABLED = "false"
@@ -47,7 +47,7 @@ resource "aws_bedrockagentcore_agent_runtime" "mcp_server" {
     # Check the server's certificate against the RDS CA bundle in the image.
     PGSSLMODE     = "verify-full"
     PGSSLROOTCERT = "/app/rds-ca.pem"
-  }
+  }, local.pitfalls_env)
 
   # Headers the runtime passes through to the container. The docs don't say
   # whether trace context reaches it without being listed here.
@@ -61,6 +61,10 @@ resource "aws_bedrockagentcore_agent_runtime" "mcp_server" {
 }
 
 locals {
+  # Left out for the baseline rather than set to "", which the runtime's
+  # API may not accept as a value.
+  pitfalls_env = var.pitfalls == "" ? {} : { PITFALLS = var.pitfalls }
+
   # Where an MCP client connects (the runtime ARN goes in URL-encoded).
   mcp_server_url = "https://bedrock-agentcore.${var.region}.amazonaws.com/runtimes/${urlencode(aws_bedrockagentcore_agent_runtime.mcp_server.agent_runtime_arn)}/invocations?qualifier=DEFAULT"
 }

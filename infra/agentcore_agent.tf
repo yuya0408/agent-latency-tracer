@@ -110,7 +110,7 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
     server_protocol = "HTTP"
   }
 
-  environment_variables = {
+  environment_variables = merge({
     # As for the MCP server (agentcore_runtime.tf).
     UNIFIED_TRACES_DESTINATION_ENABLED = "false"
     DISABLE_ADOT_OBSERVABILITY         = "true"
@@ -119,7 +119,7 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
     LLM_MODEL      = "Qwen/Qwen3-8B" # vLLM's --served-model-name (gpu_boot.sh.tftpl)
     LLM_PROVIDER   = "vllm"
     MCP_SERVER_URL = local.mcp_server_url
-  }
+  }, local.pitfalls_env)
 
   request_header_configuration {
     request_header_allowlist = ["traceparent", "tracestate"]
