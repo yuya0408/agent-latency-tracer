@@ -5,6 +5,23 @@ set -euo pipefail
 
 shutdown -h +180
 
+# Records for the life of the server, handed back by scripts/collect_gpu.sh:
+#   gpu.csv: VRAM, utilization, power, temperature and SM clock every 5 s. A clock
+#            that drops under load makes the cases run later look slower.
+#   vmstat.log: host memory every 5 s.
+# The fields follow toolcall-serving-bench's setup.sh. The name for why the
+# clock dropped changed between drivers, and one the driver rejects stops the log.
+OUT=/opt/out
+mkdir -p "$OUT"
+GPU_FIELDS=timestamp,memory.used,memory.total,utilization.gpu,power.draw,temperature.gpu,clocks.sm
+for reason in clocks_event_reasons.active clocks_throttle_reasons.active; do
+  if nvidia-smi --query-gpu="$GPU_FIELDS,$reason" --format=csv,noheader >/dev/null 2>&1; then
+    GPU_FIELDS="$GPU_FIELDS,$reason"; break
+  fi
+done
+nohup nvidia-smi --query-gpu="$GPU_FIELDS" --format=csv -l 5 > "$OUT/gpu.csv" 2>&1 < /dev/null &
+nohup vmstat -t -S M 5 > "$OUT/vmstat.log" 2>&1 < /dev/null &
+
 VLLM_IMAGE=${registry}/agent-latency-tracer/vllm:v0.31.0
 COLLECTOR_IMAGE=${registry}/agent-latency-tracer/otel-collector:0.163.1
 MODEL_REPO=Qwen/Qwen3-8B
