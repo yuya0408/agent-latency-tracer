@@ -90,6 +90,28 @@ flowchart LR
   U -.->|"span"| CW
 ```
 
+矢印は通信をかける向き。通信はすべてエージェントからかけ、何をするかはLLMが決める。1問の流れは次のとおり。
+
+```mermaid
+sequenceDiagram
+  participant U as 利用者
+  participant A as エージェント
+  participant L as LLM(vLLM)
+  participant M as MCPサーバ
+  U->>A: 質問
+  loop 答えが出るまで
+    A->>L: 会話の履歴
+    L-->>A: 呼ぶツールと引数
+    A->>M: ツールを呼ぶ
+    Note over A,M: 1つの返事にツールが複数あるとき、順に待つか同時に呼ぶか(事例1)<br/>サーバの中で処理が止まると、同時に呼んでも順になる(事例2)
+    M-->>A: 結果
+  end
+  Note over A,L: まわる回数とその上限(事例3)
+  A->>L: 結果を足した履歴
+  L-->>A: 答え
+  A-->>U: 答え
+```
+
 1問のトレースは、手元から最下層まで1本につながる(2026-11-03に確認)。
 
 ```
