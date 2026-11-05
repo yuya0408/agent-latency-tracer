@@ -5,7 +5,7 @@ as its user would: one InvokeAgentRuntime call per question.
     python scripts/invoke_agent.py 2 6
 
 With --concurrent, the questions are sent at the same time (pitfall #12,
-queueing in the inference server), e.g. `--concurrent 2 3`.
+queueing in the inference server), e.g. `--concurrent 2 3 2 3 2 3`.
 
 Each call sits in a `caller` span of its own, whose traceparent goes with the
 request, so the platform's spans and the agent's join that trace. The spans go
