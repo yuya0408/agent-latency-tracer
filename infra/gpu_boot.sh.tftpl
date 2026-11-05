@@ -31,17 +31,26 @@ docker run -d --name collector --network host \
   -v /etc/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro \
   "$COLLECTOR_IMAGE"
 
-docker run -d --name vllm --network host --gpus all \
-  -v "$MODEL_DIR:/models/Qwen3-8B:ro" \
-  -e HF_HUB_OFFLINE=1 \
-  -e OTEL_SERVICE_NAME=vllm \
-  "$VLLM_IMAGE" \
-  /models/Qwen3-8B --served-model-name "$MODEL_REPO" \
-  --host 0.0.0.0 --port "$PORT" \
-  --enable-auto-tool-choice --tool-call-parser hermes \
-  --max-model-len 16384 \
-  --enable-per-request-metrics --enable-prompt-tokens-details \
+# Written out so that vLLM can be started again in a new container with the
+# same flags: `docker rm -f vllm && /opt/run-vllm.sh`. A new container has no
+# torch.compile cache, so the KV size comes out the same each time
+# (docs/DESIGN.md §8). The variables are filled in here, when the file is written.
+cat > /opt/run-vllm.sh <<EOF
+#!/bin/bash
+docker run -d --name vllm --network host --gpus all \\
+  -v "$MODEL_DIR:/models/Qwen3-8B:ro" \\
+  -e HF_HUB_OFFLINE=1 \\
+  -e OTEL_SERVICE_NAME=vllm \\
+  "$VLLM_IMAGE" \\
+  /models/Qwen3-8B --served-model-name "$MODEL_REPO" \\
+  --host 0.0.0.0 --port "$PORT" \\
+  --enable-auto-tool-choice --tool-call-parser hermes \\
+  --max-model-len 16384 \\
+  --enable-per-request-metrics --enable-prompt-tokens-details \\
   --otlp-traces-endpoint http://127.0.0.1:4317
+EOF
+chmod +x /opt/run-vllm.sh
+/opt/run-vllm.sh
 
 until curl -sf "http://127.0.0.1:$PORT/health" >/dev/null; do sleep 5; done
 touch /opt/ready
