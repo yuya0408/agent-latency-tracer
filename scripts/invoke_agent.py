@@ -28,6 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import botocore.session
+from botocore.config import Config
 from opentelemetry import propagate, trace
 
 from scripts.run_agent import QUESTIONS
@@ -46,7 +47,11 @@ def main(numbers: list[int], concurrent: bool, cold: bool) -> None:
     region = arn.split(":")[3]
     provider = build_tracer_provider(cloudwatch_span_exporter(region), service_name="caller", batch=True)
     tracer = get_tracer(provider)
-    client = botocore.session.get_session().create_client("bedrock-agentcore", region_name=region)
+    # botocore's defaults (60 s read timeout, then a retry) sent a question
+    # longer than 60 s a second time, and the runtime ran both (2026-11-05).
+    # One attempt, and long enough for the agent's longest run.
+    config = Config(read_timeout=900, retries={"total_max_attempts": 1})
+    client = botocore.session.get_session().create_client("bedrock-agentcore", region_name=region, config=config)
 
     def new_session() -> str:
         return str(uuid.uuid4())  # at least 33 characters

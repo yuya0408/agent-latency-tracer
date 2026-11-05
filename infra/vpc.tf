@@ -16,6 +16,22 @@ resource "aws_subnet" "private" {
   tags                 = { Name = "agent-latency-tracer-${var.az_ids[count.index]}" }
 }
 
+# A subnet of its own for the GPU server when its AZ is not one of az_ids:
+# g6.xlarge runs short in one AZ at times (2026-11-05, apne1-az1).
+resource "aws_subnet" "gpu" {
+  count                = contains(var.az_ids, var.gpu_az_id) ? 0 : 1
+  vpc_id               = aws_vpc.main.id
+  availability_zone_id = var.gpu_az_id
+  cidr_block           = cidrsubnet(var.vpc_cidr, 8, 10) # 10.0.10.0/24
+  tags                 = { Name = "agent-latency-tracer-gpu-${var.gpu_az_id}" }
+}
+
+locals {
+  gpu_subnet_id = (contains(var.az_ids, var.gpu_az_id)
+    ? aws_subnet.private[index(var.az_ids, var.gpu_az_id)].id
+  : aws_subnet.gpu[0].id)
+}
+
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
   tags   = { Name = "agent-latency-tracer-private" }
@@ -24,6 +40,13 @@ resource "aws_route_table" "private" {
 resource "aws_route_table_association" "private" {
   count          = length(aws_subnet.private)
   subnet_id      = aws_subnet.private[count.index].id
+  route_table_id = aws_route_table.private.id
+}
+
+# For the S3 gateway endpoint (images and weights).
+resource "aws_route_table_association" "gpu" {
+  count          = length(aws_subnet.gpu)
+  subnet_id      = aws_subnet.gpu[count.index].id
   route_table_id = aws_route_table.private.id
 }
 

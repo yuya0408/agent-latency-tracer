@@ -11,3 +11,5 @@ out/
 infra/backend.hcl
 *.tfstate
 *.tfstate.*
+# Saved plans can hold variable and state values.
+*.tfplan

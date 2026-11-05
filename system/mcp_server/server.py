@@ -123,7 +123,12 @@ class _PgvectorRetriever:
 
         # The pool calls kwargs for every new connection, so tokens don't expire on it.
         kwargs = _rds_iam_token if os.environ.get("RDS_IAM_AUTH") == "1" else None
-        async with AsyncConnectionPool("", kwargs=kwargs, configure=register_vector_async) as pool:
+        # check: test each connection before handing it out. On AgentCore, idle
+        # pooled connections were found closed about an hour after start-up
+        # (2026-11-05), and without the check the search got the dead one.
+        async with AsyncConnectionPool(
+            "", kwargs=kwargs, configure=register_vector_async, check=AsyncConnectionPool.check_connection
+        ) as pool:
             yield {"pool": pool}
 
     async def retrieve(self, ctx: ServerRequestContext, query: str, top_k: int) -> list[int]:
