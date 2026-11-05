@@ -1,0 +1,164 @@
+<meta charset="utf-8"><title>InternalOperation (42552.7ms, 40 spans)</title><style>
+:root {
+  color-scheme: light;
+  --surface-1: #fcfcfb;
+  --surface-page: #f9f9f7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --border: rgba(11,11,11,0.10);
+  --status-critical: #d03b3b;
+  --op-invoke-agent: #2a78d6;
+  --op-retrieval: #eb6834;
+  --op-execute-tool: #1baf7a;
+  --op-chat: #eda100;
+  --op-unknown: #898781;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --surface-page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --border: rgba(255,255,255,0.10);
+    --status-critical: #e66767;
+    --op-invoke-agent: #3987e5;
+    --op-retrieval: #d95926;
+    --op-execute-tool: #199e70;
+    --op-chat: #c98500;
+    --op-unknown: #898781;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 24px;
+  background: var(--surface-page); color: var(--text-primary);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+h1 { font-size: 15px; font-weight: 600; margin: 0 0 12px; }
+.viz-root {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px; margin-bottom: 24px;
+}
+.legend { margin: 0 0 12px; }
+.legend-item {
+  display: inline-flex; align-items: center; gap: 6px; margin-right: 16px;
+  color: var(--text-secondary); font-size: 12px;
+}
+.legend-swatch { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+.gridline { stroke: var(--gridline); stroke-width: 1; }
+.axis-label { fill: var(--text-muted); font-size: 10px; }
+.row-label { fill: var(--text-primary); font-size: 12px; dominant-baseline: middle; }
+.bar-tip-label { fill: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.bar { transition: filter 0.1s ease; }
+.bar-row:hover .bar, .bar-row:focus .bar { filter: brightness(1.15); }
+.bar-row:focus { outline: none; }
+.bar-row:focus .bar { outline: 2px solid var(--text-primary); outline-offset: 1px; }
+.bar-error { stroke: var(--status-critical); stroke-width: 2px; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+th { color: var(--text-muted); font-weight: 600; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+<h1>InternalOperation (42552.7ms, 40 spans)</h1>
+<div class="viz-root">
+  <div class="legend"><span class="legend-item"><span class="legend-swatch" style="background:var(--op-unknown)"></span>unknown</span><span class="legend-item"><span class="legend-swatch" style="background:var(--op-invoke-agent)"></span>invoke_agent</span><span class="legend-item"><span class="legend-swatch" style="background:var(--op-chat)"></span>chat</span><span class="legend-item"><span class="legend-swatch" style="background:var(--op-execute-tool)"></span>execute_tool</span></div>
+  <svg width="932" height="1160" role="img" aria-label="trace waterfall">
+    <line x1="260.0" y1="24" x2="260.0" y2="1144" class="gridline" /><text x="260.0" y="16" class="axis-label">0.0ms</text> <line x1="420.0" y1="24" x2="420.0" y2="1144" class="gridline" /><text x="420.0" y="16" class="axis-label">10638ms</text> <line x1="580.0" y1="24" x2="580.0" y2="1144" class="gridline" /><text x="580.0" y="16" class="axis-label">21276ms</text> <line x1="740.0" y1="24" x2="740.0" y2="1144" class="gridline" /><text x="740.0" y="16" class="axis-label">31914ms</text> <line x1="900.0" y1="24" x2="900.0" y2="1144" class="gridline" /><text x="900.0" y="16" class="axis-label">42553ms</text>
+    <text x="16" y="38.0" class="row-label">InternalOperation</text><g class="bar-row" tabindex="0"><rect class="bar" x="260.2" y="24" width="639.8" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>InternalOperation
+unknown
+start +11.3ms  duration 42541.3ms</title></rect></g><text x="30" y="66.0" class="row-label">InvokeAgentRuntime</text><g class="bar-row" tabindex="0"><rect class="bar" x="260.2" y="52" width="639.8" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>InvokeAgentRuntime
+unknown
+start +11.3ms  duration 42541.3ms</title></rect></g><text x="44" y="94.0" class="row-label">AgentCore.Runtime.Invoke</text><g class="bar-row" tabindex="0"><rect class="bar" x="260.0" y="80" width="638.4" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>AgentCore.Runtime.Invoke
+unknown
+start +0.0ms  duration 42443.0ms</title></rect></g><text x="58" y="122.0" class="row-label">invoke_agent agent</text><g class="bar-row" tabindex="0"><rect class="bar" x="260.8" y="108" width="637.5" height="20" rx="4" ry="4" fill="var(--op-invoke-agent)"><title>invoke_agent agent
+invoke_agent
+start +51.2ms  duration 42388.9ms</title></rect></g><text x="72" y="150.0" class="row-label">chat Qwen/Qwen3-8B</text><g class="bar-row" tabindex="0"><rect class="bar" x="260.8" y="136" width="142.1" height="20" rx="4" ry="4" fill="var(--op-chat)"><title>chat Qwen/Qwen3-8B
+chat
+start +51.3ms  duration 9446.1ms</title></rect><text x="408.8" y="150.0" class="bar-tip-label">9446ms</text></g><text x="86" y="178.0" class="row-label">llm_request</text><g class="bar-row" tabindex="0"><rect class="bar" x="260.8" y="164" width="142.0" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>llm_request
+unknown
+start +55.3ms  duration 9441.4ms</title></rect><text x="408.8" y="178.0" class="bar-tip-label">9441ms</text></g><text x="72" y="206.0" class="row-label">⚠ execute_tool find_records</text><g class="bar-row" tabindex="0"><rect class="bar bar-error" x="402.8" y="192" width="10.1" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>execute_tool find_records
+execute_tool
+start +9497.6ms  duration 669.5ms
+ERROR: </title></rect><text x="418.9" y="206.0" class="bar-tip-label">670ms</text></g><text x="86" y="234.0" class="row-label">MCP send tools/call find_records</text><g class="bar-row" tabindex="0"><rect class="bar" x="402.8" y="220" width="10.1" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>MCP send tools/call find_records
+unknown
+start +9497.8ms  duration 669.1ms</title></rect><text x="418.9" y="234.0" class="bar-tip-label">669ms</text></g><text x="100" y="262.0" class="row-label">AgentCore.Runtime.Invoke</text><g class="bar-row" tabindex="0"><rect class="bar" x="403.5" y="248" width="9.0" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>AgentCore.Runtime.Invoke
+unknown
+start +9542.0ms  duration 596.0ms</title></rect><text x="418.5" y="262.0" class="bar-tip-label">596ms</text></g><text x="114" y="290.0" class="row-label">POST /mcp</text><g class="bar-row" tabindex="0"><rect class="bar" x="404.2" y="276" width="8.2" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>POST /mcp
+unknown
+start +9589.6ms  duration 545.9ms</title></rect><text x="418.4" y="290.0" class="bar-tip-label">546ms</text></g><text x="128" y="318.0" class="row-label">tools/list</text><g class="bar-row" tabindex="0"><rect class="bar" x="404.2" y="304" width="2.0" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>tools/list
+unknown
+start +9590.0ms  duration 0.3ms</title></rect><text x="412.2" y="318.0" class="bar-tip-label">0.3ms</text></g><text x="100" y="346.0" class="row-label">⚠ tools/call find_records</text><g class="bar-row" tabindex="0"><rect class="bar bar-error" x="404.2" y="332" width="8.2" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>tools/call find_records
+execute_tool
+start +9590.7ms  duration 544.0ms
+ERROR: </title></rect><text x="418.4" y="346.0" class="bar-tip-label">544ms</text></g><text x="72" y="374.0" class="row-label">execute_tool describe_data</text><g class="bar-row" tabindex="0"><rect class="bar" x="402.9" y="360" width="4.9" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>execute_tool describe_data
+execute_tool
+start +9497.9ms  duration 328.2ms</title></rect><text x="413.8" y="374.0" class="bar-tip-label">328ms</text></g><text x="86" y="402.0" class="row-label">MCP send tools/call describe_data</text><g class="bar-row" tabindex="0"><rect class="bar" x="402.9" y="388" width="4.9" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>MCP send tools/call describe_data
+unknown
+start +9498.0ms  duration 328.0ms</title></rect><text x="413.8" y="402.0" class="bar-tip-label">328ms</text></g><text x="100" y="430.0" class="row-label">AgentCore.Runtime.Invoke</text><g class="bar-row" tabindex="0"><rect class="bar" x="403.4" y="416" width="4.2" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>AgentCore.Runtime.Invoke
+unknown
+start +9532.0ms  duration 277.0ms</title></rect><text x="413.5" y="430.0" class="bar-tip-label">277ms</text></g><text x="114" y="458.0" class="row-label">POST /mcp</text><g class="bar-row" tabindex="0"><rect class="bar" x="404.0" y="444" width="3.5" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>POST /mcp
+unknown
+start +9574.5ms  duration 232.2ms</title></rect><text x="413.5" y="458.0" class="bar-tip-label">232ms</text></g><text x="128" y="486.0" class="row-label">tools/list</text><g class="bar-row" tabindex="0"><rect class="bar" x="404.0" y="472" width="2.0" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>tools/list
+unknown
+start +9574.9ms  duration 0.2ms</title></rect><text x="412.0" y="486.0" class="bar-tip-label">0.2ms</text></g><text x="100" y="514.0" class="row-label">tools/call describe_data</text><g class="bar-row" tabindex="0"><rect class="bar" x="404.0" y="500" width="3.5" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>tools/call describe_data
+execute_tool
+start +9575.6ms  duration 230.2ms</title></rect><text x="413.5" y="514.0" class="bar-tip-label">230ms</text></g><text x="72" y="542.0" class="row-label">⚠ execute_tool aggregate_records</text><g class="bar-row" tabindex="0"><rect class="bar bar-error" x="402.9" y="528" width="5.7" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>execute_tool aggregate_records
+execute_tool
+start +9498.1ms  duration 379.6ms
+ERROR: </title></rect><text x="414.6" y="542.0" class="bar-tip-label">380ms</text></g><text x="86" y="570.0" class="row-label">MCP send tools/call aggregate_records</text><g class="bar-row" tabindex="0"><rect class="bar" x="402.9" y="556" width="5.7" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>MCP send tools/call aggregate_records
+unknown
+start +9498.2ms  duration 379.4ms</title></rect><text x="414.6" y="570.0" class="bar-tip-label">379ms</text></g><text x="100" y="598.0" class="row-label">AgentCore.Runtime.Invoke</text><g class="bar-row" tabindex="0"><rect class="bar" x="403.5" y="584" width="4.7" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>AgentCore.Runtime.Invoke
+unknown
+start +9542.0ms  duration 310.0ms</title></rect><text x="414.2" y="598.0" class="bar-tip-label">310ms</text></g><text x="114" y="626.0" class="row-label">POST /mcp</text><g class="bar-row" tabindex="0"><rect class="bar" x="404.3" y="612" width="3.9" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>POST /mcp
+unknown
+start +9591.1ms  duration 258.1ms</title></rect><text x="414.1" y="626.0" class="bar-tip-label">258ms</text></g><text x="128" y="654.0" class="row-label">tools/list</text><g class="bar-row" tabindex="0"><rect class="bar" x="404.3" y="640" width="2.0" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>tools/list
+unknown
+start +9591.4ms  duration 0.2ms</title></rect><text x="412.3" y="654.0" class="bar-tip-label">0.2ms</text></g><text x="100" y="682.0" class="row-label">⚠ tools/call aggregate_records</text><g class="bar-row" tabindex="0"><rect class="bar bar-error" x="404.3" y="668" width="3.9" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>tools/call aggregate_records
+execute_tool
+start +9591.9ms  duration 256.5ms
+ERROR: </title></rect><text x="414.1" y="682.0" class="bar-tip-label">256ms</text></g><text x="72" y="710.0" class="row-label">chat Qwen/Qwen3-8B</text><g class="bar-row" tabindex="0"><rect class="bar" x="412.9" y="696" width="254.7" height="20" rx="4" ry="4" fill="var(--op-chat)"><title>chat Qwen/Qwen3-8B
+chat
+start +10167.2ms  duration 16934.6ms</title></rect><text x="673.6" y="710.0" class="bar-tip-label">16935ms</text></g><text x="86" y="738.0" class="row-label">llm_request</text><g class="bar-row" tabindex="0"><rect class="bar" x="413.0" y="724" width="254.6" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>llm_request
+unknown
+start +10170.5ms  duration 16930.2ms</title></rect><text x="673.6" y="738.0" class="bar-tip-label">16930ms</text></g><text x="72" y="766.0" class="row-label">execute_tool find_records</text><g class="bar-row" tabindex="0"><rect class="bar" x="667.6" y="752" width="10.7" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>execute_tool find_records
+execute_tool
+start +27102.0ms  duration 709.7ms</title></rect><text x="684.3" y="766.0" class="bar-tip-label">710ms</text></g><text x="86" y="794.0" class="row-label">MCP send tools/call find_records</text><g class="bar-row" tabindex="0"><rect class="bar" x="667.6" y="780" width="10.7" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>MCP send tools/call find_records
+unknown
+start +27102.2ms  duration 709.3ms</title></rect><text x="684.3" y="794.0" class="bar-tip-label">709ms</text></g><text x="100" y="822.0" class="row-label">AgentCore.Runtime.Invoke</text><g class="bar-row" tabindex="0"><rect class="bar" x="668.3" y="808" width="9.7" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>AgentCore.Runtime.Invoke
+unknown
+start +27145.0ms  duration 647.0ms</title></rect><text x="684.0" y="822.0" class="bar-tip-label">647ms</text></g><text x="114" y="850.0" class="row-label">POST /mcp</text><g class="bar-row" tabindex="0"><rect class="bar" x="668.9" y="836" width="9.1" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>POST /mcp
+unknown
+start +27188.1ms  duration 601.9ms</title></rect><text x="684.0" y="850.0" class="bar-tip-label">602ms</text></g><text x="128" y="878.0" class="row-label">tools/list</text><g class="bar-row" tabindex="0"><rect class="bar" x="668.9" y="864" width="2.0" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>tools/list
+unknown
+start +27188.5ms  duration 0.2ms</title></rect><text x="676.9" y="878.0" class="bar-tip-label">0.2ms</text></g><text x="100" y="906.0" class="row-label">tools/call find_records</text><g class="bar-row" tabindex="0"><rect class="bar" x="668.9" y="892" width="9.0" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>tools/call find_records
+execute_tool
+start +27189.2ms  duration 599.9ms</title></rect><text x="684.0" y="906.0" class="bar-tip-label">600ms</text></g><text x="72" y="934.0" class="row-label">execute_tool aggregate_records</text><g class="bar-row" tabindex="0"><rect class="bar" x="667.6" y="920" width="10.9" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>execute_tool aggregate_records
+execute_tool
+start +27102.4ms  duration 724.8ms</title></rect><text x="684.5" y="934.0" class="bar-tip-label">725ms</text></g><text x="86" y="962.0" class="row-label">MCP send tools/call aggregate_records</text><g class="bar-row" tabindex="0"><rect class="bar" x="667.6" y="948" width="10.9" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>MCP send tools/call aggregate_records
+unknown
+start +27102.5ms  duration 724.5ms</title></rect><text x="684.5" y="962.0" class="bar-tip-label">725ms</text></g><text x="100" y="990.0" class="row-label">AgentCore.Runtime.Invoke</text><g class="bar-row" tabindex="0"><rect class="bar" x="668.3" y="976" width="10.0" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>AgentCore.Runtime.Invoke
+unknown
+start +27147.0ms  duration 663.0ms</title></rect><text x="684.3" y="990.0" class="bar-tip-label">663ms</text></g><text x="114" y="1018.0" class="row-label">POST /mcp</text><g class="bar-row" tabindex="0"><rect class="bar" x="669.0" y="1004" width="9.3" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>POST /mcp
+unknown
+start +27191.4ms  duration 616.9ms</title></rect><text x="684.2" y="1018.0" class="bar-tip-label">617ms</text></g><text x="128" y="1046.0" class="row-label">tools/list</text><g class="bar-row" tabindex="0"><rect class="bar" x="669.0" y="1032" width="2.0" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>tools/list
+unknown
+start +27191.7ms  duration 0.3ms</title></rect><text x="677.0" y="1046.0" class="bar-tip-label">0.3ms</text></g><text x="100" y="1074.0" class="row-label">tools/call aggregate_records</text><g class="bar-row" tabindex="0"><rect class="bar" x="669.0" y="1060" width="9.3" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>tools/call aggregate_records
+execute_tool
+start +27192.4ms  duration 615.3ms</title></rect><text x="684.2" y="1074.0" class="bar-tip-label">615ms</text></g><text x="72" y="1102.0" class="row-label">chat Qwen/Qwen3-8B</text><g class="bar-row" tabindex="0"><rect class="bar" x="678.5" y="1088" width="219.8" height="20" rx="4" ry="4" fill="var(--op-chat)"><title>chat Qwen/Qwen3-8B
+chat
+start +27827.3ms  duration 14612.8ms</title></rect></g><text x="86" y="1130.0" class="row-label">llm_request</text><g class="bar-row" tabindex="0"><rect class="bar" x="678.6" y="1116" width="219.7" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>llm_request
+unknown
+start +27831.5ms  duration 14607.2ms</title></rect></g>
+  </svg>
+</div>
+<div class="viz-root">
+  <table>
+    <thead><tr><th>span</th><th>operation</th><th class="num">start (ms)</th><th class="num">duration (ms)</th></tr></thead>
+    <tbody><tr><td style="padding-left: calc(10px + 0 * 14px)">InternalOperation</td><td>unknown</td><td class="num">11.3</td><td class="num">42541.3</td></tr><tr><td style="padding-left: calc(10px + 1 * 14px)">InvokeAgentRuntime</td><td>unknown</td><td class="num">11.3</td><td class="num">42541.3</td></tr><tr><td style="padding-left: calc(10px + 2 * 14px)">AgentCore.Runtime.Invoke</td><td>unknown</td><td class="num">0.0</td><td class="num">42443.0</td></tr><tr><td style="padding-left: calc(10px + 3 * 14px)">invoke_agent agent</td><td>invoke_agent</td><td class="num">51.2</td><td class="num">42388.9</td></tr><tr><td style="padding-left: calc(10px + 4 * 14px)">chat Qwen/Qwen3-8B</td><td>chat</td><td class="num">51.3</td><td class="num">9446.1</td></tr><tr><td style="padding-left: calc(10px + 5 * 14px)">llm_request</td><td>unknown</td><td class="num">55.3</td><td class="num">9441.4</td></tr><tr><td style="padding-left: calc(10px + 4 * 14px)">[ERROR] execute_tool find_records</td><td>execute_tool</td><td class="num">9497.6</td><td class="num">669.5</td></tr><tr><td style="padding-left: calc(10px + 5 * 14px)">MCP send tools/call find_records</td><td>unknown</td><td class="num">9497.8</td><td class="num">669.1</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">AgentCore.Runtime.Invoke</td><td>unknown</td><td class="num">9542.0</td><td class="num">596.0</td></tr><tr><td style="padding-left: calc(10px + 7 * 14px)">POST /mcp</td><td>unknown</td><td class="num">9589.6</td><td class="num">545.9</td></tr><tr><td style="padding-left: calc(10px + 8 * 14px)">tools/list</td><td>unknown</td><td class="num">9590.0</td><td class="num">0.3</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">[ERROR] tools/call find_records</td><td>execute_tool</td><td class="num">9590.7</td><td class="num">544.0</td></tr><tr><td style="padding-left: calc(10px + 4 * 14px)">execute_tool describe_data</td><td>execute_tool</td><td class="num">9497.9</td><td class="num">328.2</td></tr><tr><td style="padding-left: calc(10px + 5 * 14px)">MCP send tools/call describe_data</td><td>unknown</td><td class="num">9498.0</td><td class="num">328.0</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">AgentCore.Runtime.Invoke</td><td>unknown</td><td class="num">9532.0</td><td class="num">277.0</td></tr><tr><td style="padding-left: calc(10px + 7 * 14px)">POST /mcp</td><td>unknown</td><td class="num">9574.5</td><td class="num">232.2</td></tr><tr><td style="padding-left: calc(10px + 8 * 14px)">tools/list</td><td>unknown</td><td class="num">9574.9</td><td class="num">0.2</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">tools/call describe_data</td><td>execute_tool</td><td class="num">9575.6</td><td class="num">230.2</td></tr><tr><td style="padding-left: calc(10px + 4 * 14px)">[ERROR] execute_tool aggregate_records</td><td>execute_tool</td><td class="num">9498.1</td><td class="num">379.6</td></tr><tr><td style="padding-left: calc(10px + 5 * 14px)">MCP send tools/call aggregate_records</td><td>unknown</td><td class="num">9498.2</td><td class="num">379.4</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">AgentCore.Runtime.Invoke</td><td>unknown</td><td class="num">9542.0</td><td class="num">310.0</td></tr><tr><td style="padding-left: calc(10px + 7 * 14px)">POST /mcp</td><td>unknown</td><td class="num">9591.1</td><td class="num">258.1</td></tr><tr><td style="padding-left: calc(10px + 8 * 14px)">tools/list</td><td>unknown</td><td class="num">9591.4</td><td class="num">0.2</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">[ERROR] tools/call aggregate_records</td><td>execute_tool</td><td class="num">9591.9</td><td class="num">256.5</td></tr><tr><td style="padding-left: calc(10px + 4 * 14px)">chat Qwen/Qwen3-8B</td><td>chat</td><td class="num">10167.2</td><td class="num">16934.6</td></tr><tr><td style="padding-left: calc(10px + 5 * 14px)">llm_request</td><td>unknown</td><td class="num">10170.5</td><td class="num">16930.2</td></tr><tr><td style="padding-left: calc(10px + 4 * 14px)">execute_tool find_records</td><td>execute_tool</td><td class="num">27102.0</td><td class="num">709.7</td></tr><tr><td style="padding-left: calc(10px + 5 * 14px)">MCP send tools/call find_records</td><td>unknown</td><td class="num">27102.2</td><td class="num">709.3</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">AgentCore.Runtime.Invoke</td><td>unknown</td><td class="num">27145.0</td><td class="num">647.0</td></tr><tr><td style="padding-left: calc(10px + 7 * 14px)">POST /mcp</td><td>unknown</td><td class="num">27188.1</td><td class="num">601.9</td></tr><tr><td style="padding-left: calc(10px + 8 * 14px)">tools/list</td><td>unknown</td><td class="num">27188.5</td><td class="num">0.2</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">tools/call find_records</td><td>execute_tool</td><td class="num">27189.2</td><td class="num">599.9</td></tr><tr><td style="padding-left: calc(10px + 4 * 14px)">execute_tool aggregate_records</td><td>execute_tool</td><td class="num">27102.4</td><td class="num">724.8</td></tr><tr><td style="padding-left: calc(10px + 5 * 14px)">MCP send tools/call aggregate_records</td><td>unknown</td><td class="num">27102.5</td><td class="num">724.5</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">AgentCore.Runtime.Invoke</td><td>unknown</td><td class="num">27147.0</td><td class="num">663.0</td></tr><tr><td style="padding-left: calc(10px + 7 * 14px)">POST /mcp</td><td>unknown</td><td class="num">27191.4</td><td class="num">616.9</td></tr><tr><td style="padding-left: calc(10px + 8 * 14px)">tools/list</td><td>unknown</td><td class="num">27191.7</td><td class="num">0.3</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">tools/call aggregate_records</td><td>execute_tool</td><td class="num">27192.4</td><td class="num">615.3</td></tr><tr><td style="padding-left: calc(10px + 4 * 14px)">chat Qwen/Qwen3-8B</td><td>chat</td><td class="num">27827.3</td><td class="num">14612.8</td></tr><tr><td style="padding-left: calc(10px + 5 * 14px)">llm_request</td><td>unknown</td><td class="num">27831.5</td><td class="num">14607.2</td></tr></tbody>
+  </table>
+</div>

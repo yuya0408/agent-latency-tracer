@@ -220,6 +220,7 @@ agent-latency-tracer/
 ├── tracing/           # 計装(span定義)と、手元用の保存・waterfall
 ├── scripts/           # 手元とAWSでの実行、トレースの書き出し(export_trace.py)
 ├── infra/             # Terraform
+├── traces/            # 手順書の根拠のトレース(伏せたJSONとwaterfallのHTML、事例ごとのフォルダ)
 ├── tests/
 └── docs/
     ├── runbook.md                 # 切り分けの手順書

@@ -1,0 +1,907 @@
+{
+ "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+ "spans": [
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "6ced92f2a65e7add",
+   "parent_span_id": "1f86c6f208de6932",
+   "name": "AgentCore.Runtime.Invoke",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866491924000000,
+   "end_time_unix_nano": 1793866536117000000,
+   "status_code": "OK",
+   "status_description": null,
+   "attributes": {
+    "latency_ms": 44153,
+    "http.status_code": 200,
+    "aws.operation.name": "InvokeAgentRuntime",
+    "http.method": "POST",
+    "http.response.status_code": 200,
+    "session.id": "81ae9f48-d4f8-4abe-98fa-5c5a715a15b1"
+   },
+   "resource": {
+    "service.name": "agent_latency_tracer_agent.DEFAULT"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "813df0195faf90b2",
+   "parent_span_id": "6ced92f2a65e7add",
+   "name": "invoke_agent agent",
+   "kind": "INTERNAL",
+   "start_time_unix_nano": 1793866491987440818,
+   "end_time_unix_nano": 1793866536114322057,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.operation.name": "invoke_agent",
+    "gen_ai.agent.name": "agent",
+    "gen_ai.conversation.id": "81ae9f48-d4f8-4abe-98fa-5c5a715a15b1"
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "7ddf8b550dcf72f0",
+   "parent_span_id": "813df0195faf90b2",
+   "name": "chat Qwen/Qwen3-8B",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1793866491987496386,
+   "end_time_unix_nano": 1793866501502905135,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "vllm.cached_tokens": 1312,
+    "gen_ai.response.model": "Qwen/Qwen3-8B",
+    "vllm.tokens_per_second": 16.5166074580046,
+    "vllm.mean_itl_ms": 60.50894824999759,
+    "gen_ai.provider.name": "vllm",
+    "gen_ai.request.temperature": 0.0,
+    "vllm.time_to_first_token_ms": 66.1880980001115,
+    "gen_ai.response.finish_reasons": [
+     "tool_calls"
+    ],
+    "gen_ai.request.model": "Qwen/Qwen3-8B",
+    "gen_ai.usage.output_tokens": 157,
+    "gen_ai.operation.name": "chat",
+    "gen_ai.usage.input_tokens": 1326,
+    "vllm.generation_time_ms": 9439.395926999623,
+    "llm.time_to_first_token_ms": 558.4823929999914,
+    "vllm.queue_time_ms": 0.009370000043418258
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "6c0cdd50982034f1",
+   "parent_span_id": "7ddf8b550dcf72f0",
+   "name": "llm_request",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866491990711808,
+   "end_time_unix_nano": 1793866501501145273,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.request.n": 1,
+    "gen_ai.usage.prompt_tokens": 1326,
+    "gen_ai.usage.completion_tokens": 157,
+    "gen_ai.latency.time_in_model_inference": 9.505584024999735,
+    "gen_ai.request.max_tokens": 15058,
+    "gen_ai.latency.time_in_model_prefill": 0.0661880980001115,
+    "gen_ai.latency.time_in_model_decode": 9.439395926999623,
+    "gen_ai.latency.e2e": 9.510177850723267,
+    "gen_ai.latency.time_in_queue": 9.370000043418258e-06,
+    "gen_ai.request.id": "chatcmpl-b8ae072a61b364ab",
+    "gen_ai.request.top_p": 1.0,
+    "gen_ai.latency.time_to_first_token": 0.07085394859313965
+   },
+   "resource": {
+    "service.name": "vllm"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "c269de00e5c5247f",
+   "parent_span_id": null,
+   "name": "InternalOperation",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866492025189572,
+   "end_time_unix_nano": 1793866536370869316,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {},
+   "resource": {
+    "service.name": "caller"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "1f86c6f208de6932",
+   "parent_span_id": "c269de00e5c5247f",
+   "name": "InvokeAgentRuntime",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1793866492025189572,
+   "end_time_unix_nano": 1793866536370869316,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {},
+   "resource": {
+    "service.name": "caller"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "e2c4c586c7d2be39",
+   "parent_span_id": "813df0195faf90b2",
+   "name": "execute_tool find_records",
+   "kind": "INTERNAL",
+   "start_time_unix_nano": 1793866501503029440,
+   "end_time_unix_nano": 1793866502164575968,
+   "status_code": "ERROR",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.tool.call.id": "chatcmpl-tool-bc19a3363d05401b",
+    "gen_ai.tool.type": "function",
+    "gen_ai.agent.name": "agent",
+    "error.type": "tool_error",
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": "find_records",
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/call"
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "92db149de25ba3e8",
+   "parent_span_id": "e2c4c586c7d2be39",
+   "name": "MCP send tools/call find_records",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1793866501503214703,
+   "end_time_unix_nano": 1793866502164405004,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.method.name": "tools/call",
+    "jsonrpc.request.id": "8"
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "161580c12b8b65e7",
+   "parent_span_id": "92db149de25ba3e8",
+   "name": "AgentCore.Runtime.Invoke",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866501553000000,
+   "end_time_unix_nano": 1793866502143000000,
+   "status_code": "OK",
+   "status_description": null,
+   "attributes": {
+    "latency_ms": 566,
+    "http.status_code": 200,
+    "aws.operation.name": "InvokeAgentRuntime",
+    "http.method": "POST",
+    "http.response.status_code": 200,
+    "session.id": "a6b8f448-3d4e-4633-9811-05d9d9982853"
+   },
+   "resource": {
+    "service.name": "agent_latency_tracer_mcp_server.DEFAULT"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "7522c98d56dbb2fe",
+   "parent_span_id": "161580c12b8b65e7",
+   "name": "POST /mcp",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866501601859033,
+   "end_time_unix_nano": 1793866502141246808,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "http.target": "/mcp",
+    "http.status_code": 200,
+    "http.method": "POST",
+    "http.response.status_code": 200
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "8600d18d153920d0",
+   "parent_span_id": "7522c98d56dbb2fe",
+   "name": "tools/list",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866501602292101,
+   "end_time_unix_nano": 1793866501602504877,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/list",
+    "jsonrpc.request.id": "8"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "080a8784a164c829",
+   "parent_span_id": "92db149de25ba3e8",
+   "name": "tools/call find_records",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866501602891617,
+   "end_time_unix_nano": 1793866502140437948,
+   "status_code": "ERROR",
+   "status_description": null,
+   "attributes": {
+    "error.type": "tool_error",
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": "find_records",
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/call",
+    "jsonrpc.request.id": "8"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "da07a00d232af753",
+   "parent_span_id": "813df0195faf90b2",
+   "name": "execute_tool describe_data",
+   "kind": "INTERNAL",
+   "start_time_unix_nano": 1793866502164687199,
+   "end_time_unix_nano": 1793866502537165912,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.tool.call.id": "chatcmpl-tool-a160eb9eab560e62",
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": "describe_data",
+    "gen_ai.tool.type": "function",
+    "gen_ai.agent.name": "agent",
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/call"
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "25806be1f21fe6f4",
+   "parent_span_id": "da07a00d232af753",
+   "name": "MCP send tools/call describe_data",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1793866502164827270,
+   "end_time_unix_nano": 1793866502537005580,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.method.name": "tools/call",
+    "jsonrpc.request.id": "9"
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "58da3159a2761bc9",
+   "parent_span_id": "25806be1f21fe6f4",
+   "name": "AgentCore.Runtime.Invoke",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866502177000000,
+   "end_time_unix_nano": 1793866502517000000,
+   "status_code": "OK",
+   "status_description": null,
+   "attributes": {
+    "latency_ms": 313,
+    "http.status_code": 200,
+    "aws.operation.name": "InvokeAgentRuntime",
+    "http.method": "POST",
+    "http.response.status_code": 200,
+    "session.id": "a6b8f448-3d4e-4633-9811-05d9d9982853"
+   },
+   "resource": {
+    "service.name": "agent_latency_tracer_mcp_server.DEFAULT"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "f07d66aa0670f1a4",
+   "parent_span_id": "58da3159a2761bc9",
+   "name": "POST /mcp",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866502215679950,
+   "end_time_unix_nano": 1793866502513382459,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "http.target": "/mcp",
+    "http.status_code": 200,
+    "http.method": "POST",
+    "http.response.status_code": 200
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "52ce0a7f20fa0a2a",
+   "parent_span_id": "f07d66aa0670f1a4",
+   "name": "tools/list",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866502216164107,
+   "end_time_unix_nano": 1793866502216374232,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/list",
+    "jsonrpc.request.id": "9"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "1f48efbbb8bcf44c",
+   "parent_span_id": "25806be1f21fe6f4",
+   "name": "tools/call describe_data",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866502216790590,
+   "end_time_unix_nano": 1793866502512762226,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": "describe_data",
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/call",
+    "jsonrpc.request.id": "9"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "f5eae3c9b72d95df",
+   "parent_span_id": "813df0195faf90b2",
+   "name": "execute_tool aggregate_records",
+   "kind": "INTERNAL",
+   "start_time_unix_nano": 1793866502537282565,
+   "end_time_unix_nano": 1793866503122295135,
+   "status_code": "ERROR",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.tool.call.id": "chatcmpl-tool-9176f2614f747eed",
+    "gen_ai.tool.type": "function",
+    "gen_ai.agent.name": "agent",
+    "error.type": "tool_error",
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": "aggregate_records",
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/call"
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "e3c860cb7abf0371",
+   "parent_span_id": "f5eae3c9b72d95df",
+   "name": "MCP send tools/call aggregate_records",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1793866502537424564,
+   "end_time_unix_nano": 1793866503122122470,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.method.name": "tools/call",
+    "jsonrpc.request.id": "10"
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "47ef0a3f46c0e2dc",
+   "parent_span_id": "e3c860cb7abf0371",
+   "name": "AgentCore.Runtime.Invoke",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866502568000000,
+   "end_time_unix_nano": 1793866503100000000,
+   "status_code": "OK",
+   "status_description": null,
+   "attributes": {
+    "latency_ms": 510,
+    "http.status_code": 200,
+    "aws.operation.name": "InvokeAgentRuntime",
+    "http.method": "POST",
+    "http.response.status_code": 200,
+    "session.id": "a6b8f448-3d4e-4633-9811-05d9d9982853"
+   },
+   "resource": {
+    "service.name": "agent_latency_tracer_mcp_server.DEFAULT"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "ece4d31c1ffffb1a",
+   "parent_span_id": "47ef0a3f46c0e2dc",
+   "name": "POST /mcp",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866502614034683,
+   "end_time_unix_nano": 1793866503097369508,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "http.target": "/mcp",
+    "http.status_code": 200,
+    "http.method": "POST",
+    "http.response.status_code": 200
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "fd5f2a4f44f274a9",
+   "parent_span_id": "ece4d31c1ffffb1a",
+   "name": "tools/list",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866502614548582,
+   "end_time_unix_nano": 1793866502614760320,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/list",
+    "jsonrpc.request.id": "10"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "07becc2916193a2b",
+   "parent_span_id": "e3c860cb7abf0371",
+   "name": "tools/call aggregate_records",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866502615151214,
+   "end_time_unix_nano": 1793866503096598333,
+   "status_code": "ERROR",
+   "status_description": null,
+   "attributes": {
+    "error.type": "tool_error",
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": "aggregate_records",
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/call",
+    "jsonrpc.request.id": "10"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "f6f6fb84a723135e",
+   "parent_span_id": "813df0195faf90b2",
+   "name": "chat Qwen/Qwen3-8B",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1793866503122395223,
+   "end_time_unix_nano": 1793866520131362506,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "vllm.cached_tokens": 1760,
+    "gen_ai.response.model": "Qwen/Qwen3-8B",
+    "vllm.tokens_per_second": 16.413017527923262,
+    "vllm.mean_itl_ms": 60.907622485611235,
+    "gen_ai.provider.name": "vllm",
+    "gen_ai.request.temperature": 0.0,
+    "vllm.time_to_first_token_ms": 66.38332200009245,
+    "gen_ai.response.finish_reasons": [
+     "tool_calls"
+    ],
+    "gen_ai.request.model": "Qwen/Qwen3-8B",
+    "gen_ai.usage.output_tokens": 279,
+    "gen_ai.operation.name": "chat",
+    "gen_ai.usage.input_tokens": 1766,
+    "vllm.generation_time_ms": 16932.319050999922,
+    "llm.time_to_first_token_ms": 77.45343699998841,
+    "vllm.queue_time_ms": 0.011890999758179532
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "9fc0fa9706f1a114",
+   "parent_span_id": "f6f6fb84a723135e",
+   "name": "llm_request",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866503125873664,
+   "end_time_unix_nano": 1793866520129836388,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.request.n": 1,
+    "gen_ai.usage.prompt_tokens": 1766,
+    "gen_ai.usage.completion_tokens": 279,
+    "gen_ai.latency.time_in_model_inference": 16.998702373000015,
+    "gen_ai.request.max_tokens": 14618,
+    "gen_ai.latency.time_in_model_prefill": 0.06638332200009245,
+    "gen_ai.latency.time_in_model_decode": 16.932319050999922,
+    "gen_ai.latency.e2e": 17.003707885742188,
+    "gen_ai.latency.time_in_queue": 1.1890999758179532e-05,
+    "gen_ai.request.id": "chatcmpl-8a2d76f9139e7d8e",
+    "gen_ai.request.top_p": 1.0,
+    "gen_ai.latency.time_to_first_token": 0.07204818725585938
+   },
+   "resource": {
+    "service.name": "vllm"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "9af267ba26f61276",
+   "parent_span_id": "813df0195faf90b2",
+   "name": "execute_tool find_records",
+   "kind": "INTERNAL",
+   "start_time_unix_nano": 1793866520131480668,
+   "end_time_unix_nano": 1793866520765282405,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.tool.call.id": "chatcmpl-tool-96f367e7c6f69d1e",
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": "find_records",
+    "gen_ai.tool.type": "function",
+    "gen_ai.agent.name": "agent",
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/call"
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "4fa352a170b2e6ff",
+   "parent_span_id": "9af267ba26f61276",
+   "name": "MCP send tools/call find_records",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1793866520131661583,
+   "end_time_unix_nano": 1793866520765122672,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.method.name": "tools/call",
+    "jsonrpc.request.id": "11"
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "a88580f2ce899308",
+   "parent_span_id": "4fa352a170b2e6ff",
+   "name": "AgentCore.Runtime.Invoke",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866520152000000,
+   "end_time_unix_nano": 1793866520743000000,
+   "status_code": "OK",
+   "status_description": null,
+   "attributes": {
+    "latency_ms": 570,
+    "http.status_code": 200,
+    "aws.operation.name": "InvokeAgentRuntime",
+    "http.method": "POST",
+    "http.response.status_code": 200,
+    "session.id": "a6b8f448-3d4e-4633-9811-05d9d9982853"
+   },
+   "resource": {
+    "service.name": "agent_latency_tracer_mcp_server.DEFAULT"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "697358aef5086324",
+   "parent_span_id": "a88580f2ce899308",
+   "name": "POST /mcp",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866520183156096,
+   "end_time_unix_nano": 1793866520740581651,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "http.target": "/mcp",
+    "http.status_code": 200,
+    "http.method": "POST",
+    "http.response.status_code": 200
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "c8c36c6831d93475",
+   "parent_span_id": "697358aef5086324",
+   "name": "tools/list",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866520183583599,
+   "end_time_unix_nano": 1793866520183801496,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/list",
+    "jsonrpc.request.id": "11"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "fde716e59fc7c76c",
+   "parent_span_id": "4fa352a170b2e6ff",
+   "name": "tools/call find_records",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866520184205296,
+   "end_time_unix_nano": 1793866520739959729,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": "find_records",
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/call",
+    "jsonrpc.request.id": "11"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "56c0fefe7c08e331",
+   "parent_span_id": "813df0195faf90b2",
+   "name": "execute_tool aggregate_records",
+   "kind": "INTERNAL",
+   "start_time_unix_nano": 1793866520765398946,
+   "end_time_unix_nano": 1793866521490616222,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.tool.call.id": "chatcmpl-tool-b255fc37f5104b6f",
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": "aggregate_records",
+    "gen_ai.tool.type": "function",
+    "gen_ai.agent.name": "agent",
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/call"
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "2e47374a639f1cca",
+   "parent_span_id": "56c0fefe7c08e331",
+   "name": "MCP send tools/call aggregate_records",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1793866520765544848,
+   "end_time_unix_nano": 1793866521490456430,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.method.name": "tools/call",
+    "jsonrpc.request.id": "12"
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "5a55a550189deae3",
+   "parent_span_id": "2e47374a639f1cca",
+   "name": "AgentCore.Runtime.Invoke",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866520772000000,
+   "end_time_unix_nano": 1793866521469000000,
+   "status_code": "OK",
+   "status_description": null,
+   "attributes": {
+    "latency_ms": 676,
+    "http.status_code": 200,
+    "aws.operation.name": "InvokeAgentRuntime",
+    "http.method": "POST",
+    "http.response.status_code": 200,
+    "session.id": "a6b8f448-3d4e-4633-9811-05d9d9982853"
+   },
+   "resource": {
+    "service.name": "agent_latency_tracer_mcp_server.DEFAULT"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "7f09f7d116d19771",
+   "parent_span_id": "5a55a550189deae3",
+   "name": "POST /mcp",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866520800997525,
+   "end_time_unix_nano": 1793866521466739339,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "http.target": "/mcp",
+    "http.status_code": 200,
+    "http.method": "POST",
+    "http.response.status_code": 200
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "5f2851317a49c359",
+   "parent_span_id": "7f09f7d116d19771",
+   "name": "tools/list",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866520801420739,
+   "end_time_unix_nano": 1793866520801636526,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/list",
+    "jsonrpc.request.id": "12"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "1f35b1ac4ef94751",
+   "parent_span_id": "2e47374a639f1cca",
+   "name": "tools/call aggregate_records",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866520802026599,
+   "end_time_unix_nano": 1793866521465903380,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": "aggregate_records",
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/call",
+    "jsonrpc.request.id": "12"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "b1a60182ea0ec1f7",
+   "parent_span_id": "813df0195faf90b2",
+   "name": "chat Qwen/Qwen3-8B",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1793866521490715662,
+   "end_time_unix_nano": 1793866536114294670,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "vllm.cached_tokens": 2240,
+    "gen_ai.response.model": "Qwen/Qwen3-8B",
+    "vllm.tokens_per_second": 16.35726344388626,
+    "vllm.mean_itl_ms": 61.1106948361343,
+    "gen_ai.provider.name": "vllm",
+    "gen_ai.request.temperature": 0.0,
+    "vllm.time_to_first_token_ms": 66.90062500001659,
+    "gen_ai.response.finish_reasons": [
+     "stop"
+    ],
+    "gen_ai.request.model": "Qwen/Qwen3-8B",
+    "gen_ai.usage.output_tokens": 239,
+    "gen_ai.operation.name": "chat",
+    "gen_ai.usage.input_tokens": 2246,
+    "vllm.generation_time_ms": 14544.345370999963,
+    "llm.time_to_first_token_ms": 79.43415999999104,
+    "vllm.queue_time_ms": 0.010989999736921163
+   },
+   "resource": {
+    "service.name": "agent",
+    "scenario.pitfalls": "1"
+   }
+  },
+  {
+   "trace_id": "6aec3afc8764b2383973c58a2ead80dd",
+   "span_id": "ce81b8f564ebc4d2",
+   "parent_span_id": "b1a60182ea0ec1f7",
+   "name": "llm_request",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1793866521494816512,
+   "end_time_unix_nano": 1793866536112806530,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.request.n": 1,
+    "gen_ai.usage.prompt_tokens": 2246,
+    "gen_ai.usage.completion_tokens": 239,
+    "gen_ai.latency.time_in_model_inference": 14.61124599599998,
+    "gen_ai.request.max_tokens": 14138,
+    "gen_ai.latency.time_in_model_prefill": 0.06690062500001659,
+    "gen_ai.latency.time_in_model_decode": 14.544345370999963,
+    "gen_ai.latency.e2e": 14.617740154266357,
+    "gen_ai.latency.time_in_queue": 1.0989999736921163e-05,
+    "gen_ai.request.id": "chatcmpl-bb5e1d936557bc93",
+    "gen_ai.request.top_p": 1.0,
+    "gen_ai.latency.time_to_first_token": 0.07338809967041016
+   },
+   "resource": {
+    "service.name": "vllm"
+   }
+  }
+ ]
+}
