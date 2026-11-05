@@ -75,6 +75,13 @@ resource "aws_vpc_endpoint" "s3" {
         Action    = ["s3:ListBucket"]
         Resource  = ["arn:aws:s3:::${local.artifacts_bucket}"]
       },
+      {
+        # The GPU server's logs and records (scripts/collect_gpu.sh).
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = ["s3:PutObject"]
+        Resource  = ["arn:aws:s3:::${local.artifacts_bucket}/runs/*"]
+      },
     ]
   })
 }

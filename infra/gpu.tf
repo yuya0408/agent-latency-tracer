@@ -98,6 +98,12 @@ resource "aws_iam_role_policy" "gpu" {
         Resource = "arn:aws:s3:::${local.artifacts_bucket}"
       },
       {
+        # Logs and records handed back before destroy (scripts/collect_gpu.sh).
+        Effect   = "Allow"
+        Action   = "s3:PutObject"
+        Resource = "arn:aws:s3:::${local.artifacts_bucket}/runs/*"
+      },
+      {
         # The Collector's spans. The OTLP endpoint answered 403 asking for
         # PutTraceSegments with PutSpans alone.
         Effect   = "Allow"
