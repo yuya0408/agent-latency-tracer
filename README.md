@@ -1,157 +1,204 @@
-# agent-latency-tracer
+# agent-latency-tracer ― AIエージェントの遅延を、トレースから原因まで切り分ける手順書を作る
 
-LLM・MCP経由のツール・RAGを持つPython製のAIエージェントで**踏みがちな遅延を再現**し、
-それぞれを**切り分けるには何を記録しておけばよいか**を確かめるプロジェクト。
-MCPサーバはAmazon Bedrock AgentCore Runtime上で動かし、計装はOpenTelemetryの規約に乗る。
+LLM・MCP経由のツール・RAGを持つPython製のAIエージェントをAWS上に組み、踏みがちな遅延を再現して、
+**どのspan・属性を見れば原因を見分けられるか**を確かめるプロジェクト。エージェントとMCPサーバはAmazon Bedrock AgentCore Runtime、
+LLMはGPUのEC2上のvLLM(Qwen3-8B)、検索はRDS(pgvector)に置き、OpenTelemetryで基盤側も含めて1本のトレースにつなぐ。
 
-## 動機
+> 運用改善の実績ではない(トラフィックは合成)。落とし穴の一部はわざと入れたもので、計装と手順書を確かめるための障害の注入にあたる。
+> 作る途中で自然に起きて突き止めたものは、「自然に発生」と分けて書く。
 
-業務で作っていたAIチャットの応答が遅かったが、ログが何も残っておらず原因を追えなかった。
-同じ状況を繰り返さないため、よくある遅延の原因と、それを見分けるのに要る計装の対応を、
-自分の手で再現して確かめておく。
+```mermaid
+flowchart LR
+  subgraph IN["材料"]
+    A["調査した落とし穴<br/>(出典つき)"]
+    B["作る途中で<br/>自然に起きた遅延"]
+  end
+  A --> C["1か所だけ切り替えて動かす<br/>(PITFALLS)"]
+  B --> D["トレースを集める<br/>(CloudWatch / 手元はSQLite)"]
+  C --> D
+  D --> E["waterfallで<br/>基準の回と比べる"]
+  E --> F{"似た症状の別の原因と<br/>見分けられるか"}
+  F -->|"見分けられる"| G["手順書に書く<br/>症状→見るspan→原因→修正"]
+  F -->|"見分けられない"| H["計装を足して<br/>比べ直す"]
+  H --> D
+  G --> I["根拠のトレースを<br/>traces/に書き出す"]
+```
 
-## 成果物
+---
 
-- **切り分けの手順書**([docs/runbook.md](docs/runbook.md)、作成中): 事例ごとに
-  「waterfallでどう見えるか → 見るべきspan・属性 → 考えられる原因 → 区別のつけ方」をまとめる
-- **根拠のトレース**([traces/](traces/)、作成予定): 手順書の各行の根拠として、実際に取ったトレースを
-  JSONで書き出し、waterfallの画像と一緒に置く(AWSアカウントIDやARNは伏せる)。AWSを使わずに
-  結果を確かめられるようにするため
-- **計装**: エージェント・MCPクライアント/サーバ・LLM呼び出し・検索へのspan設計
-- **インフラのコード**: Terraformで、使うときに作り、終わったら消す
+## 今どこまで進んだか
 
-## 進め方
+```mermaid
+flowchart LR
+  S1["1-3 手元<br/>MCPサーバ・計装<br/>エージェントループ"] --> S4["4 Terraform<br/>VPC・RDS・CloudWatch"]
+  S4 --> S5["5 MCPサーバを<br/>AgentCoreへ"]
+  S5 --> S5b["5b GPU(vLLM)<br/>エージェントもAgentCoreへ"]
+  S5b --> S6["6 事例の再現と手順書<br/>(今ここ)"]
+  S6 --> S7["公開<br/>traces/・README・Public化"]
+  classDef done fill:#d9f2d9,stroke:#3a7d3a
+  classDef now fill:#fff3c4,stroke:#b08900
+  class S1,S4,S5,S5b done
+  class S6 now
+```
 
-1. 一般に踏みがちな遅延の落とし穴を、出典つきで集める([docs/latency-pitfalls-survey.md](docs/latency-pitfalls-survey.md))
-2. 1本のエージェントの中で、1か所だけを落とし穴ありに切り替えて再現する。落とし穴ありの書き方と
-   直した書き方は、事例ごとに1つのファイルに並べて書く
-3. waterfallで見え方を確かめ、手順書に書く
-4. 見分けられないものは、何を記録すれば見分けられるかを考えて計装を足し、足す前と後を比べる
+| 段階6の作業 | 状態 |
+|---|---|
+| 自然に起きた件(設計書§7)を手順書の項目にする | 済(2026-11-04、6項目) |
+| 落とし穴の切り替え(#1・#2・#3)と、Runtimeへの渡し方(Terraformの変数`pitfalls`) | 済 |
+| 事例ごとの質問、同時に2問投げる口 | これから |
+| GPUの1回目: 基準の回(8Bで1問の時間) → #1・#2 → #3 → #12(同時2問) | これから(1回約$3〜5) |
+| GPUの2回目 | 1回目の結果を見て決める |
 
-見分けられなかったものも手順書に書く。動かしている途中で自然に起きた遅延(小さいLLMの思わぬ動きなど)も、
-「自然に発生」として手順書に加える。
+---
 
-## スコープ外
+## 症状から引く表(手順書の入口)
 
-- **運用改善の実績ではない。** トラフィックは自前で用意した合成トラフィック
-- **未知の原因を見つける仕組みではない。** 扱うのは事例集と、動かしている途中で遭遇したものの範囲
-- **応答品質は測らない。** 速度と引き換えに品質が変わりうる修正は、安価に測れるもの
-  (#5のrecall@k)だけ測り、それ以外は「品質は未計測」と書く
+遅いとき、waterfallの見え方からこの表を引き、[手順書](docs/runbook.md)の該当する項目へ進む。「予想」はまだ確かめていない行。
+
+| waterfallでの見え方 | 考えられる原因 | 見分ける手がかり | 状態 |
+|---|---|---|---|
+| ツールのspanが階段状に並ぶ | #1 逐次await / #2 asyncの中のブロッキング | 1つの応答に呼び出しが複数あるか、イベントループの遅延 | 予想(GPUの1回目) |
+| `MCP send`がサーバの`tools/call`より長い | 計装の保存がイベントループを止める / 通信 | `POST /mcp`の中か、計装をオフにすると消えるか | 確認済み |
+| `MCP send`と`tools/call`の始まりの間に隙間 | サーバの内部の`tools/list` | HTTPの層のspan | 確認済み |
+| MCPの呼び出しが毎回5〜7秒かかる | M2 毎回のコールドスタート | 基盤側のspanの`session.id`が毎回違うか | 確認済み |
+| chatのTTFTが長い | #8 長い入力 / ツール名のパーサ待ち | `vllm.time_to_first_token_ms`(サーバ側)も長いか | パーサ側は確認済み |
+| chatが長いがTTFTは短い | #9 長い出力 / 止まらない生成 | `output_tokens`・`finish_reasons` | 確認済み(2B) |
+| chatの回数が多い | #3 同じツールの繰り返し / 項目名の推測ミス | 同じツール・引数を繰り返しているか | #3は未再現 |
+| 同時に来た質問でだけ遅い | #12 推論サーバの待ち行列 | 待ち行列の時間(vLLMの`llm_request` spanと応答の本文) | 予想(GPUの1回目) |
+| 最初の1問だけ遅い | 原因未確認 | `llamacpp.prompt_ms` ÷ `prompt_n` | 原因未確認 |
+| 文書検索のspanが数百ms | #5 インデックスが無い | `SELECT documents`のspan | 測定済み(下記) |
+
+---
 
 ## 構成
 
-```
-手元のPC              AWS(東京リージョン)
-┌────────────┐       ┌──────────────────────────────────────────────────────┐
-│ 利用者役の    │       │ VPC                                                  │
-│ スクリプト    │──────▶│ AgentCore Runtime: エージェント(Python)               │
-└────────────┘ SigV4 │   ├ chat ─────────▶ GPUのEC2: 推論サーバ(Qwen3-8B)   │
-                     │   └ MCP(SigV4) ──▶ AgentCore Runtime: 自作MCPサーバ    │
-                     │                       └ 文書検索 ──▶ RDS + pgvector     │
-                     │ CloudWatch(トレース・メトリクス)                        │
-                     └──────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+  U["利用者役のスクリプト<br/>(手元のPC)"] -->|"InvokeAgentRuntime<br/>(SigV4)"| AG
+  subgraph VPC["AWS 東京リージョン・VPC"]
+    AG["AgentCore Runtime<br/>エージェント(Python・asyncio)"]
+    LLM["GPUのEC2<br/>vLLM・Qwen3-8B"]
+    MCP["AgentCore Runtime<br/>自作MCPサーバ"]
+    DB["RDS<br/>PostgreSQL + pgvector"]
+    AG -->|"chat"| LLM
+    AG -->|"MCP(SigV4)"| MCP
+    MCP -->|"文書検索"| DB
+  end
+  AG -.->|"span"| CW["CloudWatch<br/>Transaction Search"]
+  MCP -.->|"span"| CW
+  LLM -.->|"span(Collector経由)"| CW
+  U -.->|"span"| CW
 ```
 
-開発中は、エージェントとLLM(llama.cpp、Qwen3.5-2B)を手元で動かす。
+1問のトレースは、手元から最下層まで1本につながる(2026-11-03に確認)。
+
+```
+InvokeAgentRuntime(手元)
+└ AgentCore.Runtime.Invoke(エージェントの基盤)
+  └ invoke_agent
+    ├ chat → llm_request(vLLM)
+    └ execute_tool → MCP send
+                     └ AgentCore.Runtime.Invoke(MCPサーバの基盤)
+                       └ POST /mcp → tools/call retrieve_documents → SELECT documents
+```
 
 | 部品 | 実装 | 補足 |
 |---|---|---|
-| エージェント | Python・asyncio。AgentCore Runtimeで動かす | LLMがツール(業務ツール・文書検索)を選んで呼び、結果を見て次を決めるループ |
-| LLM | GPUのEC2上のvLLM(OpenAI互換API)で、Qwen3-8B。開発中は手元のllama.cppでQwen3.5-2B | 手元のCPUではLLMが時間のほとんどを占め、ツールや検索の遅れが埋もれるため、事例の再現はGPUで行う。OpenAI互換なので、接続先を変えるだけで差し替えられる |
-| ツール | 自作のMCPサーバ(公式Python SDKの低レベルAPI、Streamable HTTP) | 業務ツール4つ(データの種類を引数で指定する汎用型)とモック実行(200〜800ms待ってから、小さな合成データを返す)、文書検索ツール。AgentCore Runtimeに預けて動かす |
-| 認証 | IAMの署名(SigV4) | 手元のAWSクレデンシャルで署名する |
-| RAG | RDS for PostgreSQL + pgvector | 検索はMCPサーバのツールの1つで、使うかどうかはLLMが決める。RDSはVPCの中だけに置き、インターネットに出さない |
-| 計装 | OpenTelemetry(GenAI規約・MCP規約) | トレースの文脈はMCPリクエストの`params._meta.traceparent`でサーバに渡す |
-| 保存・可視化 | CloudWatch(Transaction Search) | AgentCoreが出す基盤側のspan・メトリクスと、自分で張ったspanを同じ場所に集める |
+| エージェント | Python・asyncio | LLMがツールを選んで呼び、結果を見て次を決めるループ |
+| LLM | vLLM(OpenAI互換)・Qwen3-8B。開発中は手元のllama.cpp・Qwen3.5-2B | CPUの2BではLLMが時間のほとんどを占め、ほかの遅れが埋もれるので、再現はGPUで行う |
+| ツール | 自作のMCPサーバ(公式Python SDKの低レベルAPI、Streamable HTTP) | 業務ツール4つ(汎用型、モックは200〜800ms待って合成データを返す)と文書検索 |
+| 計装 | OpenTelemetry(GenAI規約・MCP規約) | トレースの文脈はMCPの`params._meta.traceparent`とHTTPヘッダで渡す。サーバ側の計装はオフにもできる(計装の無いサーバを想定) |
+| インフラ | Terraform | 使うときに作り、終わったら消す |
 
-**手元だけでも動く。** MCPサーバとエージェントはAWSを使わずに手元で動かせる(検索はfaiss、トレースは
-自作のSQLite保存と単一HTMLのwaterfallビューア)。開発中の確認と、AWSを使わずにコードを試したい読み手のため。
+---
 
-```bash
-# Linux(WindowsではWSL)で。venvは ~/.venvs/agent-latency-tracer に作り、pip install -e ".[dev]"
-# トレースの保存先は、測定中の書き込みが遅くならないよう、Linux側のディスクに置く
-export TRACE_DB=~/traces/traces.db
-# ターミナル1: MCPサーバ(127.0.0.1:8000/mcp)
-~/.venvs/agent-latency-tracer/bin/python -m system.mcp_server
-# ターミナル2: ツールを3つ「1つずつ」と「同時に」呼び、waterfallをout/に出す
-~/.venvs/agent-latency-tracer/bin/python scripts/try_mcp.py
-# ターミナル2: 仮の質問をエージェントに流し、質問ごとのwaterfallをout/に出す
-# (llama.cppを127.0.0.1:8080で起動しておく。1問20〜60秒ほど)
-~/.venvs/agent-latency-tracer/bin/python scripts/run_agent.py
-```
+## 用語
 
-**MCPサーバ側の計装はオン/オフを切り替えられるようにする。** サーバが別の言語・別のチームで作られていて
-計装が無い、という状況はよくあるため。
+| 用語 | 意味 |
+|---|---|
+| span / トレース | 処理1つの開始と終了の記録 / 1つの質問に属するspanの木 |
+| waterfall | spanを時間の横棒で並べた図。待ちや直列が見える |
+| 基盤側のspan | AgentCoreが出すspan(`AgentCore.Runtime.Invoke`)。自分のコードの外の時間が分かる |
+| TTFT | 最初のトークンが届くまでの時間。クライアント側とvLLM側で別に記録する |
+| 落とし穴の切り替え | 環境変数`PITFALLS`(例: `1,2`)。各プロセスが起動時に読み、自分の側の番号だけ効く |
+| 自然に発生 | わざと入れたのではなく、作る途中で起きた遅延 |
 
-**AWSで再現する場合**: Terraformで環境を作り、使い終わったら消す。費用の目安と消す手順は、インフラを
-作る段階でここに書く。
+---
 
 ## 事例集
 
 番号は[調査メモ](docs/latency-pitfalls-survey.md)の番号。
 
-| # | 落とし穴 | 修正 |
-|---|---|---|
-| 1 | 独立したtool呼び出しを逐次awaitする | `asyncio.gather`で並列化 |
-| 2 | async関数の中でブロッキング呼び出し(gatherしても実質直列) | 非同期I/O/スレッドへ逃がす |
-| 3 | エージェントループの過剰反復(同じtoolを何度も呼ぶ) | 反復回数の上限 |
-| M2 | リクエストごとにMCPクライアントを作り直す(接続・版の問い合わせ・ツール一覧の取り直し。AgentCoreではセッションIDを使い回せず、新しいmicroVMのコールドスタートを待つ) | クライアントの再利用 |
-| R | MCPのタイムアウト→リトライが1つのspanの中に隠れる | リトライの各試行を記録する |
-| 5 | ベクトル検索のインデックスが無く全件走査になる(pgvector) | HNSWインデックスを作る |
-| M1 | tool定義の多さによるプロンプトの膨張 | 必要なtoolだけ渡す/遅延ロード |
-| M4 | 大きなtool結果が次のターンのコンテキストに積まれる | 結果の要約・切り詰め |
-| 8/9 | 長い入力(prefill)と長い出力(decode) | 入力の絞り込み/出力長の制御 |
-| 10 | プレフィックスキャッシュが効かない(先頭に日時等の動的値) | 動的値を後ろへ移す |
-| 12 | 同時に来た質問が推論サーバの待ち行列で待たされる | 並行数に見合う台数・設定にする |
+| # | 落とし穴 | 修正 | 状態 |
+|---|---|---|---|
+| 1 | 独立したツール呼び出しを逐次awaitする | `asyncio.gather`で並列化 | 切り替え済み・未実測 |
+| 2 | asyncの中のブロッキング呼び出し(MCPサーバ側) | 非同期I/O・スレッドへ逃がす | 切り替え済み・未実測 |
+| 3 | エージェントループの過剰反復 | 反復回数の上限 | 2Bでは起きず、8Bで見る |
+| M2 | MCPのセッションを使い回せず、毎回コールドスタート | `Mcp-Session-Id`を送り返す | 自然に発生・確認済み(31秒→5.6秒) |
+| 5 | ベクトル検索のインデックスが無い | HNSWインデックス | 測定済み |
+| 12 | 同時の質問が推論サーバの待ち行列で待つ | 並行数に見合う台数・設定 | 同時2問で見る |
+| R・M1・M4・8/9・10 | リトライ、ツール定義の膨張、大きなツール結果、長い入出力、プレフィックスキャッシュ | | 未着手 |
 
-M2は作る途中で実際に起きた([設計書](docs/DESIGN.md)の§7の12)ので、再現し直さずその記録から書く。
-#3も作る途中で起きた(§7の4)が、spanを付ける前だった。手元の2Bで同じ条件を試すと繰り返さなかった(2026-11-04)ので、8Bの回で見る。
-「検索を1件ずつ呼ぶ」(#6)は、HNSWありの検索が1件1ms(§8)で差が出ない見込みのため外した(2026-10-31)。
+「検索を1件ずつ呼ぶ」(#6)は、HNSWありの検索が1件1msで差が出ない見込みのため外した(2026-10-31)。
 
-**候補(事例を選ぶときに採否を決める)**: リクエストのたびに認証や署名の準備をやり直す。
-動かしている途中で見つかったものは[設計書](docs/DESIGN.md)の§7。
-
-### 検索についての実測メモ(事例5、RDSのpgvector)
-
-RDS for PostgreSQL(db.t4g.medium)のpgvectorで、同じ表に対して「HNSWなし」と「HNSWあり」を測った値
-(2026-10-26)。条件(1024次元×10万件、top-5)は、測る前に現実の値から決めた。根拠と詳しい値は[設計書](docs/DESIGN.md)の§1・§8。
+**検索の実測(#5、2026-10-26)**: RDS(db.t4g.medium)、1024次元×10万件、top-5。条件は測る前に現実の値から決めた。
 
 | | HNSWなし(全件走査) | HNSWあり |
 |---|---|---|
 | DBの中の実行時間(中央値) | 488ms | 1.0ms |
 | p95 | 625ms | 1.5ms |
 
-- HNSWのパラメータはpgvectorの初期値のまま。取りこぼし(recall@5)は0.882。全件走査の結果を正解としたので、
-  追加のラベル付けは要らない
-- 表(533MB)とインデックス(781MB)はメモリに収まっていた(ディスクからの読み込みは0)
+HNSWのパラメータはpgvectorの初期値のまま。recall@5は0.882(全件走査の結果を正解にした)。詳しくは[設計書](docs/DESIGN.md)の§8。
+
+---
+
+## 限界と範囲外
+
+| 項目 | 言えないこと |
+|---|---|
+| トラフィック | 合成。実際の利用者の分布での頻度は分からない |
+| 原因の範囲 | 事例集と、作る途中で遭遇したものだけ。未知の原因を見つける仕組みではない |
+| 応答品質 | 測らない。安く測れるもの(#5のrecall@k)だけ測る |
+| モデル・エンジン | Qwen3-8B・vLLM 0.31.0での見え方。パーサの待ちなどは版に依存する |
+
+---
+
+## 動かし方(手元)
+
+AWSを使わずに、MCPサーバとエージェントを手元で動かせる(検索はfaiss、トレースは自作のSQLite保存と単一HTMLのwaterfall)。
+
+```bash
+# Linux(WindowsではWSL)で。venvは ~/.venvs/agent-latency-tracer に作り、pip install -e ".[dev]"
+export TRACE_DB=~/traces/traces.db          # 測定中の書き込みが遅くならないよう、Linux側のディスクに置く
+# ターミナル1: MCPサーバ(127.0.0.1:8000/mcp)。落とし穴を入れるなら PITFALLS=2 などを付ける
+~/.venvs/agent-latency-tracer/bin/python -m system.mcp_server
+# ターミナル2: 仮の質問をエージェントに流し、質問ごとのwaterfallをout/に出す(llama.cppを127.0.0.1:8080で起動しておく)
+~/.venvs/agent-latency-tracer/bin/python scripts/run_agent.py
+```
+
+AWSでは`infra/`のTerraformで作り、`-var pitfalls=1,2`のように落とし穴を選ぶ。作り方・消し方・費用は[設計書](docs/DESIGN.md)の§6・§8。
+
+---
 
 ## ディレクトリ構成
 
 ```
 agent-latency-tracer/
-├── system/                 # 観測対象のエージェント
-│   ├── tools/               # 業務ツールの定義、データの種類と項目、合成データ、モック実行
-│   ├── retrieval/            # 手元用の検索(faiss)
-│   ├── mcp_server/            # 自作MCPサーバ
-│   ├── mcp_client.py          # 計装つきMCPクライアント
-│   ├── agent.py               # エージェントループ
-│   └── llm/                   # OpenAI互換クライアント
-├── tracing/                  # 計装と、手元用の保存・可視化
-│   ├── instrumentation.py    # OTel span定義
-│   ├── exporter.py            # SQLiteへのexporter(手元用)
-│   └── viewer/waterfall.py     # waterfallビューア(手元用)
-├── scripts/                  # 手元での動作確認
-├── infra/                    # Terraform(作成予定)
-├── traces/                   # 手順書の根拠にするトレース(作成予定)
+├── system/            # 観測対象のエージェント
+│   ├── agent.py         # エージェントループ
+│   ├── pitfalls.py      # 落とし穴の切り替え(PITFALLS)
+│   ├── mcp_client.py    # 計装つきMCPクライアント
+│   ├── mcp_server/      # 自作MCPサーバ
+│   ├── tools/           # 業務ツールの定義、合成データ、モック実行
+│   ├── retrieval/       # 手元用の検索(faiss)
+│   └── llm/             # OpenAI互換クライアント
+├── tracing/           # 計装(span定義)と、手元用の保存・waterfall
+├── scripts/           # 手元とAWSでの実行、トレースの書き出し(export_trace.py)
+├── infra/             # Terraform
 ├── tests/
 └── docs/
-    ├── DESIGN.md               # 設計書(現状と次にやること)
-    ├── latency-pitfalls-survey.md  # 事例の調査メモ(出典つき)
-    ├── tool-catalog-survey.md     # 業務ツールの形を決めるための調査メモ
-    └── runbook.md              # 切り分けの手順書(作成予定)
+    ├── runbook.md                 # 切り分けの手順書
+    ├── DESIGN.md                  # 設計書(決定事項・次にやること・見つかったこと・実測値)
+    ├── latency-pitfalls-survey.md # 事例の調査メモ(出典つき)
+    └── tool-catalog-survey.md     # 業務ツールの形を決めるための調査メモ
 ```
-
-業務ツールは、公開されている業務システムのMCPサーバに多い汎用型にした。データの構造を調べる`describe_data`、
-探す`find_records`、1件取る`get_record`、集計する`aggregate_records`の4つで、データの種類(販売・購買・在庫・会計・
-人事と共通マスタの15種類)は引数で指定する。種類と項目は`system/tools/data_schema.json`、モックが返す合成データは`system/tools/mock_data.json`。決めた経緯は
-[設計書](docs/DESIGN.md)§6の2bと[調査メモ](docs/tool-catalog-survey.md)。
