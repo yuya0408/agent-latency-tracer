@@ -116,7 +116,7 @@ resource "aws_iam_instance_profile" "gpu" {
 resource "aws_instance" "gpu" {
   ami                    = data.aws_ssm_parameter.dlami.value
   instance_type          = "g6.xlarge"
-  subnet_id              = aws_subnet.private[0].id
+  subnet_id              = local.gpu_subnet_id
   vpc_security_group_ids = [aws_security_group.gpu.id]
   iam_instance_profile   = aws_iam_instance_profile.gpu.name
 
