@@ -385,12 +385,18 @@
 
 - **GPUの1回目(2026-11-05、g6.xlarge・1c、vLLM 0.31.0、Qwen3-8B bf16)**。GPUは07:14〜08:35 UTCの約1時間20分、全体で約3時間(在庫待ち約40分を含む)
   - g6.xlargeの在庫が、ap-northeast-1c(apne1-az1)と1a(apne1-az4)の間で交互に切れた。1cで約35分、1aで約25分取れず、1cに戻して取れた。
-    Terraformは容量不足を数分おきに再試行し続ける。GPUのAZは変数`gpu_az_id`で選べるようにした
+    Terraformは容量不足を数分おきに再試行し続ける。GPUのAZは変数`gpu_az_id`で選べるようにした。
+    前例: `toolcall-serving-bench`の手順書(`docs/gpu-runbook.md`)では、10-22は1cで切れて1aで通り、10-26は1cと1aの両方で切れて約1.5時間後に1cで立った。
+    対処の順: 容量不足が数回続いたら、Terraformを止めて(Ctrl-C。インスタンスは作られていない)`-var gpu_az_id=apne1-az4`でapplyし直す。
+    そこでも続けば、AZを行き来せず、どちらかで待つ(待つ間は土台の課金だけが続く)
   - 土台のapply(59個)は11分、GPUとエージェントのRuntimeのapplyは6分(Runtimeの作成4分31秒)。vLLMの準備完了はGPUの起動から約14分
   - 落とし穴の切り替え(両方のRuntimeの環境変数の更新)は、planを含めて約2分半。Runtimeの更新そのものは22秒。イメージのタグを変えたMCPサーバの更新も22秒
   - vLLMのコンテナの作り直し(`docker rm -f vllm && /opt/run-vllm.sh`)は約4分で、KVは22,976トークンにそろった
   - 1問の時間(温めたセッション、基準): 10.2〜68.6秒、中央値約23.5秒。入力は1回のLLM呼び出しで約1,300〜3,600トークン、1トークン約60ms
   - destroyでは、AgentCoreの`agentic_ai`型ENI 2つがSGをつかみ、VPC・サブネット1・SG 2が残った(11-03と同じ)
+  - 費用: GPUの時間(`LaunchTime`から終了まで)×単価で見積もり(約1時間20分・約$1.6)、翌日以降にCost Explorerの実額で確かめる(`toolcall-serving-bench`の手順書と同じ)。
+    月$60の予算と通知(実額50%・100%、予測100%)は`toolcall-serving-bench`の`infra/budgets.tf`にあり、アカウント全体が対象なので、このプロジェクトの消し忘れにも効く
+  - 回収し忘れたもの: vLLMとCollectorのコンテナのログ。KVの行と`/metrics`の一部は手元に残したが、ログ全体はdestroyで消えた。2回目からはdestroyの前に回収する
 
 - PCメモリ総量 13.74GB。大きな配列を作る前に空きを確認する
 - 手元のfaiss(2026-10-04以前、Windows側。手元で動かすための代わりの部品で、事例の値ではない): `hnswlib`は
