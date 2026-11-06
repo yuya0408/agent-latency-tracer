@@ -67,9 +67,9 @@ flowchart LR
 | chatの回数が多い | #3 同じツールの繰り返し / 項目名の推測ミス | 同じツール・引数を繰り返しているか、`invoke_agent`の`error.type`が`max_turns_exceeded`か | 注入では起きず、自然に1回 |
 | 同時に来た質問でだけ遅い | #12 推論サーバの待ち行列 | 待ち行列の時間(vLLMの`llm_request` spanと応答の本文) | 同時6問では待ち0 |
 | 呼び出し側は1回なのに、基盤側の`AgentCore.Runtime.Invoke`が同じセッションで2つ並ぶ | クライアントのタイムアウトと自動再送 | 手元の`InvokeAgentRuntime`の数と、基盤側の数 | 確認済み(自然に発生) |
-| しばらく使われなかった後の最初の検索だけ失敗する | 接続プールが切れた接続を渡す | MCPサーバのログの`OperationalError`・`discarding closed connection` | 確認済み(自然に発生) |
+| 新しいセッションの最初の検索だけ、7〜8秒かかるか失敗する | 割り当ての前に作ったDBの接続が切れている | `tools/call`の中で`SELECT documents`が始まるまでの空き、MCPサーバのログの`connection failed check` | 確認済み(自然に発生)・修正の確かめは未 |
 | 最初の1問だけ遅い | 原因未確認 | `llamacpp.prompt_ms` ÷ `prompt_n` | 原因未確認 |
-| 文書検索のspanが数百ms | #5 インデックスが無い | `SELECT documents`のspan | 測定済み(下記) |
+| 文書検索のspanが数百ms | #5 インデックスが無い | `SELECT documents`のspan | 確認済み |
 
 ---
 
@@ -160,7 +160,7 @@ InvokeAgentRuntime(手元)
 | 2 | asyncの中のブロッキング呼び出し(MCPサーバ側) | 非同期I/O・スレッドへ逃がす | 再現済み(サーバ側が階段) |
 | 3 | エージェントループの過剰反復 | 反復回数の上限 | 注入では2B・8Bとも起きず。8Bの基準の回で自然に1回 |
 | M2 | MCPのセッションを使い回せず、毎回コールドスタート | `Mcp-Session-Id`を送り返す | 自然に発生・確認済み(31秒→5.6秒) |
-| 5 | ベクトル検索のインデックスが無い | HNSWインデックス | 測定済み |
+| 5 | ベクトル検索のインデックスが無い | HNSWインデックス | 再現済み(`SELECT documents`のspanが480〜540ms→10〜12ms) |
 | 12 | 同時の質問が推論サーバの待ち行列で待つ | 並行数に見合う台数・設定 | 同時6問では待ち0・preemption 0 |
 | R・M1・M4・8/9・10 | リトライ、ツール定義の膨張、大きなツール結果、長い入出力、プレフィックスキャッシュ | | 未着手 |
 
@@ -174,6 +174,7 @@ InvokeAgentRuntime(手元)
 | p95 | 625ms | 1.5ms |
 
 HNSWのパラメータはpgvectorの初期値のまま。recall@5は0.882(全件走査の結果を正解にした)。詳しくは[設計書](docs/DESIGN.md)の§8。
+MCPサーバ経由のwaterfallでの見え方は[手順書](docs/runbook.md)の#5(2026-11-06)。
 
 ---
 
