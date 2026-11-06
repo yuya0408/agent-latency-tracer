@@ -120,6 +120,23 @@ def test_pitfall_1_awaits_tool_calls_one_after_another(monkeypatch):
     assert [m["tool_call_id"] for m in llm.requests[1] if m["role"] == "tool"] == ["c1", "c2"]
 
 
+def test_no_system_prompt_by_default():
+    llm = ScriptedLlm([_asks(_call("c1", "describe_data", {})), _answers("done")])
+    _run(llm, ["q"])
+    assert all(r[0]["role"] == "user" for r in llm.requests)
+
+
+def test_pitfall_10_starts_every_llm_call_with_the_time():
+    llm = ScriptedLlm([_asks(_call("c1", "describe_data", {})), _answers("done")])
+    (result,) = _run(llm, ["q"], time_in_prompt=True)
+    for request in llm.requests:
+        assert request[0]["role"] == "system"
+        assert request[0]["content"].startswith("現在の日時: ")
+        assert request[1] == {"role": "user", "content": "q"}
+    # Made per call, not kept in the conversation.
+    assert [m["role"] for m in result.messages] == ["user", "assistant", "tool", "assistant"]
+
+
 def test_spans_nest_under_one_invoke_agent_span():
     llm = ScriptedLlm([_asks(_call("c1", "find_records", {"type": "item"})), _answers("done")])
     _run(llm, ["q"])

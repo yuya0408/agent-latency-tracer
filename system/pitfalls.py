@@ -21,7 +21,8 @@ RESOURCE_ATTRIBUTE = "scenario.pitfalls"
 #   1  agent: tool calls from one response are awaited one by one (system/agent.py)
 #   2  MCP server: business tools wait with time.sleep inside async code (system/tools/mock_server.py)
 #   3  MCP server: business tools answer without records (system/tools/mock_server.py)
-AVAILABLE: frozenset[str] = frozenset({"1", "2", "3"})
+#   10 agent: every LLM call starts with the current time to the second (system/agent.py)
+AVAILABLE: frozenset[str] = frozenset({"1", "2", "3", "10"})
 
 
 def enabled() -> frozenset[str]:
