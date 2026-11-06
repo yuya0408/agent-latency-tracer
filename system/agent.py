@@ -3,7 +3,10 @@
 This is the corrected baseline the latency cases are built against:
 - tool calls the LLM asks for in one response run concurrently (asyncio.gather);
 - one MCP connection is reused for every call, and the tool list is fetched once;
-- no system prompt.
+- no system prompt;
+- a conversation is kept in memory for its session (on AgentCore, a session is
+  one agent process), so a follow-up question carries the earlier ones, trimmed
+  to the last HISTORY_WINDOW messages.
 
 Each run is one invoke_agent span; under it sit the chat spans (one per LLM
 call) and the execute_tool spans (one per tool call). Tool calls from the
@@ -25,6 +28,9 @@ from tracing.instrumentation import invoke_agent_span, mark_error
 
 # OpenAI Agents SDK's DEFAULT_MAX_TURNS. Counts LLM calls, as the SDK does.
 MAX_TURNS = 10
+# Strands Agents' default conversation manager keeps the last 40 messages
+# (SlidingWindowConversationManager(window_size=40)).
+HISTORY_WINDOW = 40
 
 
 @dataclass
@@ -65,9 +71,20 @@ class Agent:
         self._sequential_tools = sequential_tools
         self._time_in_prompt = time_in_prompt
         self._tools: list[dict[str, Any]] | None = None
+        self._histories: dict[str, list[dict[str, Any]]] = {}
 
     async def run(self, question: str, *, conversation_id: str | None = None) -> AgentResult:
-        messages: list[dict[str, Any]] = [{"role": "user", "content": question}]
+        """With a conversation_id, the question continues that conversation;
+        without one, it starts a new conversation that is not kept. A run that
+        fails (an exception) leaves the conversation as it was."""
+        history = self._histories.get(conversation_id, []) if conversation_id else []
+        messages: list[dict[str, Any]] = [*history, {"role": "user", "content": question}]
+        result = await self._run(messages, conversation_id)
+        if conversation_id:
+            self._histories[conversation_id] = _last_turns(messages, HISTORY_WINDOW)
+        return result
+
+    async def _run(self, messages: list[dict[str, Any]], conversation_id: str | None) -> AgentResult:
         with invoke_agent_span(self._tracer, agent_name=self._name, conversation_id=conversation_id) as span:
             trace_id = f"{span.get_span_context().trace_id:032x}"
             if self._tools is None:  # first run only, so it shows up in that run's trace
@@ -103,3 +120,14 @@ class Agent:
             result = await self._mcp.call_tool(call["function"]["name"], arguments, tool_call_id=call["id"])
             content = "\n".join(c.text for c in result.content if isinstance(c, types.TextContent))
         return {"role": "tool", "tool_call_id": call["id"], "content": content}
+
+
+def _last_turns(messages: list[dict[str, Any]], window: int) -> list[dict[str, Any]]:
+    """The last `window` messages or fewer, starting at a user message, so no
+    tool result is kept without the assistant message that asked for it. If
+    the last question alone runs longer than the window, all of it is kept."""
+    if len(messages) <= window:
+        return list(messages)
+    users = [i for i, m in enumerate(messages) if m["role"] == "user"]
+    start = next((i for i in users if i >= len(messages) - window), users[-1])
+    return messages[start:]

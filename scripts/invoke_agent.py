@@ -14,8 +14,9 @@ infra/account/).
 
 A runtime session is one agent process. By default the questions share one
 session, warmed up first with a question that is not measured (its span has
-caller.warmup=true), so the agent's start-up stays out of them; each question
-is still a new conversation. With --concurrent, each question has a session of
+caller.warmup=true), so the agent's start-up stays out of them. The agent keeps
+the conversation for its session (system/agent.py), so each question follows
+the warm-up and the questions before it. With --concurrent, each question has a session of
 its own, all warmed up before the questions go. --cold gives every question a
 new session without warming up, for looking at the start-up itself.
 """
