@@ -27,6 +27,7 @@ from system.retrieval.corpus import generate_corpus, generate_queries
 from system.retrieval.search import build_flat_index, search
 from system.tools.loader import load_catalog
 from system.tools.mock_server import call_tool as call_mock_tool
+from system.tools.per_type import per_type_tools, to_baseline
 from tracing.instrumentation import db_query_span
 
 SERVER_NAME = "agent-latency-tracer-tools"
@@ -48,14 +49,16 @@ _PGVECTOR_SEARCH = f"SELECT id FROM {PGVECTOR_TABLE} ORDER BY embedding <-> %s L
 _tracer = trace.get_tracer("agent-latency-tracer")
 
 
-def _business_tools() -> list[types.Tool]:
+def _business_tools(per_type: bool = False) -> list[types.Tool]:
+    """per_type=True is pitfall M1's switch (system/tools/per_type.py)."""
+    defs = per_type_tools() if per_type else load_catalog().values()
     return [
         types.Tool(
             name=t["name"],
             description=t["description"],
             input_schema=t["inputSchema"],
         )
-        for t in load_catalog().values()
+        for t in defs
     ]
 
 
@@ -170,7 +173,8 @@ def build_server(
     `pitfalls` are the cases switched on in this server (system/pitfalls.py)."""
     blocking = "2" in pitfalls
     contentless = "3" in pitfalls
-    tools = _business_tools()
+    per_type = "M1" in pitfalls
+    tools = _business_tools(per_type)
     business_names = {t.name for t in tools}
     if retrieval == "faiss":
         retriever: _Retriever | _PgvectorRetriever = _Retriever(corpus_n)
@@ -192,7 +196,10 @@ def build_server(
             ids = await retriever.retrieve(ctx, arguments["query"], arguments.get("top_k", DEFAULT_TOP_K))
             return _text_result({"document_ids": ids})
         if params.name in business_names:
-            result = await call_mock_tool(params.name, arguments, contentless=contentless, blocking=blocking)
+            name = params.name
+            if per_type:
+                name, arguments = to_baseline(name, arguments)
+            result = await call_mock_tool(name, arguments, contentless=contentless, blocking=blocking)
             return _text_result(result, is_error=result["status"] == "error")
         return _text_result({"error": f"unknown tool: {params.name}"}, is_error=True)
 
