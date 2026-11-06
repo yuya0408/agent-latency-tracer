@@ -64,7 +64,7 @@ flowchart LR
 | MCPの呼び出しが毎回5〜7秒かかる | M2 毎回のコールドスタート | 基盤側のspanの`session.id`が毎回違うか | 確認済み |
 | chatのTTFTが長い | #8 長い入力 / ツール名のパーサ待ち | `vllm.time_to_first_token_ms`(サーバ側)も長いか | パーサ側は確認済み |
 | chatが長いがTTFTは短い | #9 長い出力 / 止まらない生成 | `output_tokens`・`finish_reasons` | 確認済み(2B) |
-| chatの回数が多い | #3 同じツールの繰り返し / 項目名の推測ミス | 同じツール・引数を繰り返しているか、`invoke_agent`の`error.type`が`max_turns_exceeded`か | 注入では起きず、自然に1回 |
+| chatの回数が多い | #3 同じツールの繰り返し / ツール呼び出しの外れ(項目名の推測など) | 同じツール・引数を繰り返しているか、`invoke_agent`の`error.type`が`max_turns_exceeded`か。外れは、最初の`execute_tool`の`error.type`が`tool_error` | 繰り返しは注入では起きず自然に1回。外れは8Bで25回中23回 |
 | 同時に来た質問でだけ遅い | #12 推論サーバの待ち行列 | 待ち行列の時間(vLLMの`llm_request` spanと応答の本文) | 同時6問では待ち0 |
 | 呼び出し側は1回なのに、基盤側の`AgentCore.Runtime.Invoke`が同じセッションで2つ並ぶ | クライアントのタイムアウトと自動再送 | 手元の`InvokeAgentRuntime`の数と、基盤側の数 | 確認済み(自然に発生) |
 | 新しいセッションの最初の検索だけ、7〜8秒かかるか失敗する | 割り当ての前に作ったDBの接続が切れている | `tools/call`の中で`SELECT documents`が始まるまでの空き、MCPサーバのログの`connection failed check` | 確認済み(自然に発生)・修正の確かめは未 |
