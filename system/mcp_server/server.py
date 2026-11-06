@@ -107,10 +107,10 @@ class _PgvectorRetriever:
     settings come from the libpq environment variables (PGHOST, PGUSER, ...);
     with RDS_IAM_AUTH=1 the password is an IAM token made per connection.
 
-    The pool is opened once per process in the server's lifespan and reached
-    through ctx.lifespan_context. Async, so a search doesn't hold up the
-    event loop, and pooled, so concurrent tool calls don't queue on one
-    connection."""
+    The pool is made once per process in the server's lifespan, opened on the
+    first search, and reached through ctx.lifespan_context. Async, so a search
+    doesn't hold up the event loop, and pooled, so concurrent tool calls don't
+    queue on one connection."""
 
     def __init__(self) -> None:
         self._queries = generate_queries(N_QUERY_VECTORS, dim=PGVECTOR_DIM)
@@ -123,17 +123,25 @@ class _PgvectorRetriever:
 
         # The pool calls kwargs for every new connection, so tokens don't expire on it.
         kwargs = _rds_iam_token if os.environ.get("RDS_IAM_AUTH") == "1" else None
-        # check: test each connection before handing it out. On AgentCore, idle
-        # pooled connections were found closed about an hour after start-up
-        # (2026-11-05), and without the check the search got the dead one.
-        async with AsyncConnectionPool(
-            "", kwargs=kwargs, configure=register_vector_async, check=AsyncConnectionPool.check_connection
-        ) as pool:
+        # open=False: no connections until the first search. AgentCore starts
+        # the process before it assigns a session, and connections made then
+        # were reset at their first use after the assignment (2026-11-06).
+        # check: test each connection before handing it out, for one that
+        # dies while it sits unused in the pool.
+        pool = AsyncConnectionPool(
+            "", kwargs=kwargs, configure=register_vector_async, check=AsyncConnectionPool.check_connection,
+            open=False,
+        )
+        try:
             yield {"pool": pool}
+        finally:
+            await pool.close()
 
     async def retrieve(self, ctx: ServerRequestContext, query: str, top_k: int) -> list[int]:
         vector = self._queries[zlib.crc32(query.encode("utf-8")) % N_QUERY_VECTORS]
-        async with ctx.lifespan_context["pool"].connection() as conn:
+        pool = ctx.lifespan_context["pool"]
+        await pool.open()  # does nothing once the pool is open
+        async with pool.connection() as conn:
             info = conn.info
             with db_query_span(
                 _tracer, system="postgresql", operation="SELECT", collection=PGVECTOR_TABLE,

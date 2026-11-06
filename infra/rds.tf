@@ -20,8 +20,9 @@ resource "aws_vpc_security_group_ingress_rule" "rds_from_bastion" {
 }
 
 # Log each connection and disconnection, to see from the database's side when
-# and why the MCP server's pooled connections end (on 2026-11-05 they were
-# found dead after 4 minutes unused). Read with the RDS console or
+# and why the MCP server's pooled connections end (with it, on 2026-11-06,
+# connections made before AgentCore assigned a session were seen reset at their
+# first use after it). Read with the RDS console or
 # `aws rds download-db-log-file-portion`; not exported to CloudWatch.
 resource "aws_db_parameter_group" "main" {
   name   = "agent-latency-tracer"
