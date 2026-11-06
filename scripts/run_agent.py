@@ -73,7 +73,8 @@ async def main(numbers: list[int], cloudwatch: bool) -> None:
 
     trace_ids: dict[int, str] = {}
     async with LlmClient(tracer) as llm, McpToolClient(SERVER_URL, tracer, agent_name="agent") as mcp:
-        agent = Agent(llm, mcp, tracer, sequential_tools="1" in pitfalls.enabled())
+        enabled = pitfalls.enabled()
+        agent = Agent(llm, mcp, tracer, sequential_tools="1" in enabled, time_in_prompt="10" in enabled)
         for n in numbers:
             question = QUESTIONS[n - 1]
             start = time.perf_counter()
