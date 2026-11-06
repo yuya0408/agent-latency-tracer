@@ -12,7 +12,7 @@ Environment variables:
   PITFALLS         cases switched on in the server (system/pitfalls.py)
 """
 from __future__ import annotations
-import os
+import logging, os
 
 import uvicorn
 from opentelemetry import trace
@@ -28,6 +28,12 @@ PORT = 8000  # AgentCore Runtime expects MCP servers on 8000, path /mcp
 
 
 def main() -> None:
+    retrieval = os.environ.get("RETRIEVAL_BACKEND", "faiss")
+    if retrieval == "pgvector":
+        # The pool logs at INFO why a connection failed its check and when it
+        # adds a new one; without a handler only warnings would come out.
+        logging.basicConfig(format="%(asctime)s %(name)s %(levelname)s %(message)s")
+        logging.getLogger("psycopg.pool").setLevel(logging.INFO)
     otel = os.environ.get("MCP_SERVER_OTEL", "1") != "0"
     provider = None
     if otel:
@@ -42,7 +48,7 @@ def main() -> None:
     server = build_server(
         otel=otel,
         corpus_n=int(os.environ.get("CORPUS_N", DEFAULT_CORPUS_N)),
-        retrieval=os.environ.get("RETRIEVAL_BACKEND", "faiss"),
+        retrieval=retrieval,
         pitfalls=pitfalls.enabled(),
     )
     # Stateless, as AgentCore Runtime recommends: no per-session state kept in

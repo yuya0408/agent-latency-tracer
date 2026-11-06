@@ -19,6 +19,27 @@ resource "aws_vpc_security_group_ingress_rule" "rds_from_bastion" {
   to_port                      = 5432
 }
 
+# Log each connection and disconnection, to see from the database's side when
+# and why the MCP server's pooled connections end (with it, on 2026-11-06,
+# connections made before AgentCore assigned a session were seen reset at their
+# first use after it). Read with the RDS console or
+# `aws rds download-db-log-file-portion`; not exported to CloudWatch.
+resource "aws_db_parameter_group" "main" {
+  name   = "agent-latency-tracer"
+  family = "postgres18"
+
+  # PostgreSQL 18 takes a list here; "all" also logs how long each connection
+  # took to set up (setup_durations).
+  parameter {
+    name  = "log_connections"
+    value = "all"
+  }
+  parameter {
+    name  = "log_disconnections"
+    value = "1"
+  }
+}
+
 resource "aws_db_instance" "main" {
   identifier     = "agent-latency-tracer"
   engine         = "postgres"
@@ -38,6 +59,7 @@ resource "aws_db_instance" "main" {
   # password (a DB user granted rds_iam; scripts/create_mcp_server_user.sql).
   iam_database_authentication_enabled = true
 
+  parameter_group_name   = aws_db_parameter_group.main.name
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
   publicly_accessible    = false
