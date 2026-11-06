@@ -120,6 +120,65 @@ def test_pitfall_1_awaits_tool_calls_one_after_another(monkeypatch):
     assert [m["tool_call_id"] for m in llm.requests[1] if m["role"] == "tool"] == ["c1", "c2"]
 
 
+def test_no_system_prompt_by_default():
+    llm = ScriptedLlm([_asks(_call("c1", "describe_data", {})), _answers("done")])
+    _run(llm, ["q"])
+    assert all(r[0]["role"] == "user" for r in llm.requests)
+
+
+def test_pitfall_10_starts_every_llm_call_with_the_time():
+    llm = ScriptedLlm([_asks(_call("c1", "describe_data", {})), _answers("done")])
+    (result,) = _run(llm, ["q"], time_in_prompt=True)
+    for request in llm.requests:
+        assert request[0]["role"] == "system"
+        assert request[0]["content"].startswith("現在の日時: ")
+        assert request[1] == {"role": "user", "content": "q"}
+    # Made per call, not kept in the conversation.
+    assert [m["role"] for m in result.messages] == ["user", "assistant", "tool", "assistant"]
+
+
+def _run_conversation(llm: ScriptedLlm, turns: list[tuple[str, str | None]], **agent_kwargs):
+    """(question, conversation_id) pairs, run in order on one agent."""
+    async def run():
+        server = build_server(otel=False, corpus_n=SMALL_CORPUS)
+        async with McpToolClient(server, TRACER, agent_name="test") as mcp:
+            agent = Agent(llm, mcp, TRACER, name="test", **agent_kwargs)
+            return [await agent.run(q, conversation_id=c) for q, c in turns]
+
+    return asyncio.run(run())
+
+
+def test_a_session_keeps_its_conversation():
+    llm = ScriptedLlm([
+        _asks(_call("c1", "describe_data", {})), _answers("a1"),
+        _answers("a2"),
+        _answers("other"),
+    ])
+    _run_conversation(llm, [("q1", "s1"), ("q2", "s1"), ("q3", "s2")])
+    # q2 carries q1 with its tool call; s2 starts empty.
+    assert [m["role"] for m in llm.requests[2]] == ["user", "assistant", "tool", "assistant", "user"]
+    assert llm.requests[2][0]["content"] == "q1"
+    assert llm.requests[3] == [{"role": "user", "content": "q3"}]
+
+
+def test_without_a_conversation_id_nothing_is_kept():
+    llm = ScriptedLlm([_answers("a1"), _answers("a2")])
+    _run_conversation(llm, [("q1", None), ("q2", None)])
+    assert llm.requests[1] == [{"role": "user", "content": "q2"}]
+
+
+def test_history_is_trimmed_at_a_question(monkeypatch):
+    monkeypatch.setattr("system.agent.HISTORY_WINDOW", 5)
+    # Each question: user, assistant(tool call), tool, assistant = 4 messages.
+    llm = ScriptedLlm([r for i in range(3) for r in (_asks(_call(f"c{i}", "describe_data", {})), _answers(f"a{i}"))])
+    _run_conversation(llm, [("q0", "s"), ("q1", "s"), ("q2", "s")])
+    # Before q2, the history was q0 and q1 (8 messages); the last 5 start mid-q0,
+    # so only q1 is kept.
+    sent = llm.requests[4]
+    assert sent[0] == {"role": "user", "content": "q1"}
+    assert [m["role"] for m in sent] == ["user", "assistant", "tool", "assistant", "user"]
+
+
 def test_spans_nest_under_one_invoke_agent_span():
     llm = ScriptedLlm([_asks(_call("c1", "find_records", {"type": "item"})), _answers("done")])
     _run(llm, ["q"])

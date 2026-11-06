@@ -76,7 +76,10 @@ async def lifespan(app: Starlette) -> AsyncIterator[None]:
     server_url = os.environ.get("MCP_SERVER_URL", "http://127.0.0.1:8000/mcp")
     # One connection for the life of the process, as in the baseline (system/agent.py).
     async with llm, McpToolClient(server_url, tracer, agent_name="agent") as mcp:
-        app.state.agent = Agent(llm, mcp, tracer, sequential_tools="1" in pitfalls.enabled())
+        enabled = pitfalls.enabled()
+        app.state.agent = Agent(
+            llm, mcp, tracer, sequential_tools="1" in enabled, time_in_prompt="10" in enabled
+        )
         yield
     provider.shutdown()  # write out spans still queued in the batch processor
 

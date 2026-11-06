@@ -96,6 +96,34 @@ def _two_calls_at_once(pitfalls: frozenset[str]) -> float:
     return _with_client(calls, pitfalls=pitfalls)
 
 
+def test_pitfall_m1_lists_one_tool_per_data_type_and_answers_like_the_baseline():
+    async def per_type(client):
+        names = [t.name for t in await client.list_tools()]
+        found = await client.call_tool("find_sales_order", {"partner_id": "P001"})
+        one = await client.call_tool("get_sales_order", {"id": "SO-1003"})
+        total = await client.call_tool("aggregate_sales_order", {"op": "sum", "field": "amount", "group_by": ["partner_id"]})
+        return names, found, one, total
+
+    async def baseline(client):
+        found = await client.call_tool(
+            "find_records", {"type": "sales_order", "filter": [{"field": "partner_id", "op": "eq", "value": "P001"}]}
+        )
+        one = await client.call_tool("get_record", {"type": "sales_order", "id": "SO-1003"})
+        total = await client.call_tool(
+            "aggregate_records", {"type": "sales_order", "metric": {"op": "sum", "field": "amount"}, "group_by": ["partner_id"]}
+        )
+        return found, one, total
+
+    names, *m1 = _with_client(per_type, pitfalls=frozenset({"M1"}))
+    base = _with_client(baseline)
+    assert len(names) == 15 * 3 + 1  # find/get/aggregate per data type, plus retrieval
+    assert {"find_sales_order", "get_sales_order", "aggregate_sales_order", RETRIEVAL_TOOL} <= set(names)
+    assert "find_records" not in names
+    for got, want in zip(m1, base):
+        assert not got.is_error
+        assert _payload(got) == _payload(want)
+
+
 def test_concurrent_tool_calls_overlap_on_the_server(monkeypatch):
     monkeypatch.setattr(mock_server, "MIN_LATENCY_S", 0.2)
     monkeypatch.setattr(mock_server, "MAX_LATENCY_S", 0.2)

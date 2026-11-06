@@ -3,7 +3,10 @@
 This is the corrected baseline the latency cases are built against:
 - tool calls the LLM asks for in one response run concurrently (asyncio.gather);
 - one MCP connection is reused for every call, and the tool list is fetched once;
-- no system prompt.
+- no system prompt;
+- a conversation is kept in memory for its session (on AgentCore, a session is
+  one agent process), so a follow-up question carries the earlier ones, trimmed
+  to the last HISTORY_WINDOW messages.
 
 Each run is one invoke_agent span; under it sit the chat spans (one per LLM
 call) and the execute_tool spans (one per tool call). Tool calls from the
@@ -13,6 +16,7 @@ concurrently.
 from __future__ import annotations
 import asyncio, json
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 from mcp import types
@@ -24,6 +28,9 @@ from tracing.instrumentation import invoke_agent_span, mark_error
 
 # OpenAI Agents SDK's DEFAULT_MAX_TURNS. Counts LLM calls, as the SDK does.
 MAX_TURNS = 10
+# Strands Agents' default conversation manager keeps the last 40 messages
+# (SlidingWindowConversationManager(window_size=40)).
+HISTORY_WINDOW = 40
 
 
 @dataclass
@@ -45,25 +52,45 @@ class Agent:
         name: str = "agent",
         max_turns: int = MAX_TURNS,
         sequential_tools: bool = False,
+        time_in_prompt: bool = False,
     ) -> None:
         """sequential_tools=True is pitfall #1's switch (system/pitfalls.py):
-        the tool calls from one response are awaited one after another."""
+        the tool calls from one response are awaited one after another.
+
+        time_in_prompt=True is pitfall #10's: every LLM call starts with a
+        system prompt holding the current time to the second, made afresh for
+        that call, as a prompt template filled in at each model call does.
+        The chat template puts the system prompt before the tool definitions,
+        so the prompt differs from the first tokens on and the server's prefix
+        cache cannot reuse anything, not even within one question."""
         self._llm = llm
         self._mcp = mcp
         self._tracer = tracer
         self._name = name
         self._max_turns = max_turns
         self._sequential_tools = sequential_tools
+        self._time_in_prompt = time_in_prompt
         self._tools: list[dict[str, Any]] | None = None
+        self._histories: dict[str, list[dict[str, Any]]] = {}
 
     async def run(self, question: str, *, conversation_id: str | None = None) -> AgentResult:
-        messages: list[dict[str, Any]] = [{"role": "user", "content": question}]
+        """With a conversation_id, the question continues that conversation;
+        without one, it starts a new conversation that is not kept. A run that
+        fails (an exception) leaves the conversation as it was."""
+        history = self._histories.get(conversation_id, []) if conversation_id else []
+        messages: list[dict[str, Any]] = [*history, {"role": "user", "content": question}]
+        result = await self._run(messages, conversation_id)
+        if conversation_id:
+            self._histories[conversation_id] = _last_turns(messages, HISTORY_WINDOW)
+        return result
+
+    async def _run(self, messages: list[dict[str, Any]], conversation_id: str | None) -> AgentResult:
         with invoke_agent_span(self._tracer, agent_name=self._name, conversation_id=conversation_id) as span:
             trace_id = f"{span.get_span_context().trace_id:032x}"
             if self._tools is None:  # first run only, so it shows up in that run's trace
                 self._tools = to_openai_tools(await self._mcp.list_tools())
             for turn in range(1, self._max_turns + 1):
-                result = await self._llm.chat(messages, self._tools)
+                result = await self._llm.chat(self._with_time(messages), self._tools)
                 messages.append(result.as_message())
                 if not result.tool_calls:
                     return AgentResult(result.content, messages, turn, "answer", trace_id)
@@ -74,6 +101,12 @@ class Agent:
                     messages.extend(await asyncio.gather(*(self._call_tool(c) for c in result.tool_calls)))
             mark_error(span, "max_turns_exceeded")
             return AgentResult("", messages, self._max_turns, "max_turns", trace_id)
+
+    def _with_time(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not self._time_in_prompt:
+            return messages
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        return [{"role": "system", "content": f"現在の日時: {now}"}, *messages]
 
     async def _call_tool(self, call: dict[str, Any]) -> dict[str, Any]:
         """Run one tool call and return the tool message for it. A tool's error
@@ -87,3 +120,14 @@ class Agent:
             result = await self._mcp.call_tool(call["function"]["name"], arguments, tool_call_id=call["id"])
             content = "\n".join(c.text for c in result.content if isinstance(c, types.TextContent))
         return {"role": "tool", "tool_call_id": call["id"], "content": content}
+
+
+def _last_turns(messages: list[dict[str, Any]], window: int) -> list[dict[str, Any]]:
+    """The last `window` messages or fewer, starting at a user message, so no
+    tool result is kept without the assistant message that asked for it. If
+    the last question alone runs longer than the window, all of it is kept."""
+    if len(messages) <= window:
+        return list(messages)
+    users = [i for i, m in enumerate(messages) if m["role"] == "user"]
+    start = next((i for i in users if i >= len(messages) - window), users[-1])
+    return messages[start:]
