@@ -31,7 +31,7 @@ variable "vpc_cidr" {
 
 variable "pitfalls" {
   description = <<-EOT
-    Cases to switch on (system/pitfalls.py), e.g. "1,2". Both runtimes get
+    Cases to switch on (system/pitfalls.py), e.g. "1,2" or "10,M1". Both runtimes get
     the same value: each process acts only on its own cases, and both record
     it on their spans, so a trace says which run it came from. Empty is the
     baseline.
@@ -40,7 +40,7 @@ variable "pitfalls" {
   default     = ""
 
   validation {
-    condition     = can(regex("^([0-9]+(,[0-9]+)*)?$", var.pitfalls))
-    error_message = "pitfalls: case numbers separated by commas, without spaces (e.g. \"1,2\")."
+    condition     = can(regex("^([A-Z]?[0-9]+(,[A-Z]?[0-9]+)*)?$", var.pitfalls))
+    error_message = "pitfalls: case numbers separated by commas, without spaces (e.g. \"1,2\" or \"10,M1\")."
   }
 }
