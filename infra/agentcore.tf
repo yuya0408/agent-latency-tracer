@@ -31,8 +31,8 @@ locals {
   })
 
   # The execution role in the AgentCore docs, narrowed to this project and with
-  # no Bedrock model access (the LLM is self-hosted). Each runtime adds ECR
-  # access to its own repository.
+  # no Bedrock model access (the LLM is self-hosted; the MCP server's role adds
+  # the one embeddings model). Each runtime adds ECR access to its own repository.
   runtime_common_statements = [
     {
       Effect   = "Allow"
@@ -112,6 +112,19 @@ resource "aws_iam_role_policy" "agentcore_runtime_rds" {
       Effect   = "Allow"
       Action   = "rds-db:connect"
       Resource = "arn:aws:rds-db:${var.region}:${local.account_id}:dbuser:${aws_db_instance.main.resource_id}/${local.mcp_server_db_user}"
+    }]
+  })
+}
+
+# Embedding the retrieval query with Titan Text Embeddings V2, and nothing else on Bedrock.
+resource "aws_iam_role_policy" "agentcore_runtime_bedrock" {
+  role = aws_iam_role.agentcore_runtime.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "bedrock:InvokeModel"
+      Resource = "arn:aws:bedrock:${var.region}::foundation-model/amazon.titan-embed-text-v2:0"
     }]
   })
 }
