@@ -124,6 +124,37 @@ def test_pitfall_m1_lists_one_tool_per_data_type_and_answers_like_the_baseline()
         assert _payload(got) == _payload(want)
 
 
+def test_pitfall_m1_tools_take_ranges_like_the_baseline():
+    # "B社からの仕入請求で、支払期日が10月中のもの": a period, not one date.
+    period = {"due_date_from": "2026-10-01", "due_date_to": "2026-10-31"}
+
+    async def per_type(client):
+        found = await client.call_tool("find_purchase_invoice", {"partner_id": "P002", **period})
+        total = await client.call_tool("aggregate_purchase_invoice", {"op": "sum", "field": "amount", **period})
+        return found, total
+
+    async def baseline(client):
+        conditions = [
+            {"field": "due_date", "op": "gte", "value": "2026-10-01"},
+            {"field": "due_date", "op": "lte", "value": "2026-10-31"},
+        ]
+        found = await client.call_tool(
+            "find_records",
+            {"type": "purchase_invoice", "filter": [{"field": "partner_id", "op": "eq", "value": "P002"}, *conditions]},
+        )
+        total = await client.call_tool(
+            "aggregate_records", {"type": "purchase_invoice", "metric": {"op": "sum", "field": "amount"}, "filter": conditions}
+        )
+        return found, total
+
+    m1 = _with_client(per_type, pitfalls=frozenset({"M1"}))
+    base = _with_client(baseline)
+    for got, want in zip(m1, base):
+        assert not got.is_error
+        assert _payload(got) == _payload(want)
+    assert _payload(base[0])["total"] > 0  # the period has rows, so the comparison means something
+
+
 def test_concurrent_tool_calls_overlap_on_the_server(monkeypatch):
     monkeypatch.setattr(mock_server, "MIN_LATENCY_S", 0.2)
     monkeypatch.setattr(mock_server, "MAX_LATENCY_S", 0.2)
