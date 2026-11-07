@@ -63,17 +63,30 @@ def main(numbers: list[int], concurrent: bool, cold: bool) -> None:
             carrier: dict[str, str] = {}
             propagate.inject(carrier)
             start = time.perf_counter()
-            response = client.invoke_agent_runtime(
-                agentRuntimeArn=arn,
-                runtimeSessionId=session_id,
-                contentType="application/json",
-                accept="application/json",
-                payload=json.dumps({"question": question}, ensure_ascii=False).encode(),
-                traceParent=carrier["traceparent"],
-            )
-            body = json.loads(response["response"].read())
-            elapsed = time.perf_counter() - start
             trace_id = f"{span.get_span_context().trace_id:032x}"
+            try:
+                response = client.invoke_agent_runtime(
+                    agentRuntimeArn=arn,
+                    runtimeSessionId=session_id,
+                    contentType="application/json",
+                    accept="application/json",
+                    payload=json.dumps({"question": question}, ensure_ascii=False).encode(),
+                    traceParent=carrier["traceparent"],
+                )
+                body = json.loads(response["response"].read())
+            except Exception as e:
+                # A failed question (e.g. the prompt outgrew vLLM's context)
+                # is a result too: report it and go on to the next one. The
+                # agent keeps the conversation as it was before the question.
+                span.record_exception(e)
+                span.set_status(trace.StatusCode.ERROR, type(e).__name__)
+                elapsed = time.perf_counter() - start
+                return "\n".join([
+                    f"--- {label}: {question}",
+                    f"{elapsed:.1f}s, failed: {type(e).__name__}: {e}",
+                    f"trace {trace_id}",
+                ])
+            elapsed = time.perf_counter() - start
         # The agent reports the trace it ran in, which should be this one.
         return "\n".join([
             f"--- {label}: {question}",
