@@ -58,7 +58,10 @@ resource "aws_vpc_endpoint" "s3" {
   service_name      = "com.amazonaws.${var.region}.s3"
   vpc_endpoint_type = "Gateway"
   route_table_ids   = [aws_route_table.private.id]
+  # Without Version, AWS stores the policy with "2008-10-17" added, and every
+  # plan showed it as a change (2026-11-07). The other policies all set it.
   policy = jsonencode({
+    Version = "2012-10-17"
     Statement = [
       {
         Effect    = "Allow"
