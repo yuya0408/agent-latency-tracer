@@ -54,6 +54,8 @@ TOOL_DESCRIPTION = "gen_ai.tool.description"
 TOOL_CALL_ARGUMENTS = "gen_ai.tool.call.arguments"  # opt-in, may be sensitive
 TOOL_CALL_RESULT = "gen_ai.tool.call.result"  # opt-in, may be sensitive
 
+EMBEDDINGS_DIMENSION_COUNT = "gen_ai.embeddings.dimension.count"
+
 ERROR_TYPE = "error.type"
 
 # --- mcp.* attribute keys (OTel MCP semantic conventions) -------------------
@@ -68,6 +70,7 @@ DB_SYSTEM_NAME = "db.system.name"
 DB_OPERATION_NAME = "db.operation.name"
 DB_COLLECTION_NAME = "db.collection.name"
 DB_QUERY_TEXT = "db.query.text"  # parameterized, so no values in it
+DB_RETURNED_ROWS = "db.response.returned_rows"
 SERVER_ADDRESS = "server.address"
 SERVER_PORT = "server.port"
 
@@ -200,6 +203,29 @@ def set_retrieval_results(
     if not capture_content:
         return
     span.set_attribute(RETRIEVAL_DOCUMENTS, json.dumps(list(documents)))
+
+
+@contextmanager
+def embeddings_span(
+    tracer: trace.Tracer,
+    *,
+    provider_name: str,
+    request_model: str,
+    dimension_count: int | None = None,
+) -> Iterator[Span]:
+    """Span for one embeddings call, named `embeddings {model}` as the GenAI
+    conventions suggest. The input text is not recorded."""
+    attributes: dict[str, Any] = {
+        OP_NAME: "embeddings",
+        PROVIDER_NAME: provider_name,
+        REQUEST_MODEL: request_model,
+    }
+    if dimension_count is not None:
+        attributes[EMBEDDINGS_DIMENSION_COUNT] = dimension_count
+    with tracer.start_as_current_span(
+        f"embeddings {request_model}", kind=SpanKind.CLIENT, attributes=attributes
+    ) as span:
+        yield span
 
 
 @contextmanager
