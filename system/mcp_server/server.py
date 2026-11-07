@@ -155,14 +155,21 @@ class _TitanEmbedder:
             return payload["embedding"]
 
 
-def _rds_iam_token() -> dict[str, str]:
-    """A fresh IAM auth token as the password. Valid 15 minutes, and signed
-    locally (no request to AWS), so making one per new connection is cheap."""
-    import botocore.session  # needs the "aws" extra
+class _RdsIamToken:
+    """Called by the pool for every new connection: a fresh IAM auth token as
+    the password. Valid 15 minutes, and signed locally (no request to AWS), so
+    making one per connection is cheap. The pool calls this synchronously in
+    the event loop, so the client is made once, at start-up, like the Titan
+    client: making it reads botocore's service model and would block."""
 
-    host, port, user = os.environ["PGHOST"], int(os.environ.get("PGPORT", "5432")), os.environ["PGUSER"]
-    rds = botocore.session.get_session().create_client("rds")
-    return {"password": rds.generate_db_auth_token(DBHostname=host, Port=port, DBUsername=user)}
+    def __init__(self) -> None:
+        import botocore.session  # needs the "aws" extra
+
+        self._rds = botocore.session.get_session().create_client("rds")
+
+    def __call__(self) -> dict[str, str]:
+        host, port, user = os.environ["PGHOST"], int(os.environ.get("PGPORT", "5432")), os.environ["PGUSER"]
+        return {"password": self._rds.generate_db_auth_token(DBHostname=host, Port=port, DBUsername=user)}
 
 
 class _PgvectorRetriever:
@@ -186,7 +193,7 @@ class _PgvectorRetriever:
         from psycopg_pool import AsyncConnectionPool
 
         # The pool calls kwargs for every new connection, so tokens don't expire on it.
-        kwargs = _rds_iam_token if os.environ.get("RDS_IAM_AUTH") == "1" else None
+        kwargs = _RdsIamToken() if os.environ.get("RDS_IAM_AUTH") == "1" else None
         # open=False: no connections until the first search. AgentCore starts
         # the process before it assigns a session, and connections made then
         # were reset at their first use after the assignment (2026-11-06).
