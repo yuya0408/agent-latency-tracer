@@ -6,7 +6,9 @@ with each field as its own argument, instead of one `find_records` taking the
 type as an argument. With the 15 data types this is 45 tools, about 9,300
 tokens of definitions against the baseline's 1,100 (Qwen3's tokenizer, as the
 chat template writes them). The calls are translated to the baseline tools,
-so the data and the answers stay the same.
+so the data stays the same. Each field argument is an equality, as in such
+servers, so a question that needs a range ("in September 2026") can take
+another path than with the baseline's filters.
 """
 from __future__ import annotations
 from typing import Any
