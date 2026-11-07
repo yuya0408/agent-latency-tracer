@@ -5,9 +5,9 @@ Environment variables:
   TRACE_TO         where the spans go: "sqlite" (default), "cloudwatch", or both
                    ("sqlite,cloudwatch"). cloudwatch needs the "aws" extra and AWS credentials
   TRACE_DB         SQLite file the server's spans go to (default "traces.db")
-  CORPUS_N         retrieval corpus size (default system.mcp_server.server.DEFAULT_CORPUS_N)
   MCP_SERVER_HOST  address to listen on (default "127.0.0.1"; the container sets "0.0.0.0")
-  RETRIEVAL_BACKEND  "faiss" (default) or "pgvector"; pgvector reads PGHOST, PGUSER, ... like libpq
+  RETRIEVAL_BACKEND  "faiss" (default) or "pgvector"; pgvector reads PGHOST, PGUSER, ... like libpq,
+                   and embeds the query with Bedrock in AWS_REGION (needs the "aws" extra)
   RDS_IAM_AUTH     "1": log in to RDS with an IAM token instead of PGPASSWORD (needs the "aws" extra)
   PITFALLS         cases switched on in the server (system/pitfalls.py)
 """
@@ -19,7 +19,7 @@ from opentelemetry import trace
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware as HttpSpanMiddleware
 
 from system import pitfalls
-from system.mcp_server.server import DEFAULT_CORPUS_N, build_server
+from system.mcp_server.server import build_server
 from tracing.exporter import exporters_from_env
 from tracing.instrumentation import build_tracer_provider
 
@@ -47,7 +47,6 @@ def main() -> None:
         trace.set_tracer_provider(provider)
     server = build_server(
         otel=otel,
-        corpus_n=int(os.environ.get("CORPUS_N", DEFAULT_CORPUS_N)),
         retrieval=retrieval,
         pitfalls=pitfalls.enabled(),
     )

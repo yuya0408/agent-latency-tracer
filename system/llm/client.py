@@ -141,7 +141,14 @@ class LlmClient:
         headers: dict[str, str] = {}
         propagate.inject(headers)
         async with self._http.stream("POST", self._url, json=body, headers=headers) as response:
-            response.raise_for_status()
+            if response.is_error:
+                # The body says why (vLLM: the input is longer than the context);
+                # raise_for_status alone would leave only the status on the span.
+                await response.aread()
+                raise httpx2.HTTPStatusError(
+                    f"{response.status_code} from {self._url}: {response.text[:500]}",
+                    request=response.request, response=response,
+                )
             async for line in response.aiter_lines():
                 if not line.startswith("data: "):
                     continue

@@ -40,16 +40,27 @@ def test_db(monkeypatch):
         admin.execute(f"CREATE DATABASE {TEST_DB}")
     with psycopg.connect("", dbname=TEST_DB) as conn:
         conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-        conn.execute(f"CREATE TABLE {PGVECTOR_TABLE} (id integer PRIMARY KEY, embedding vector({PGVECTOR_DIM}))")
+        conn.execute(
+            f"CREATE TABLE {PGVECTOR_TABLE} (id text PRIMARY KEY, source text, text text, embedding vector({PGVECTOR_DIM}))"
+        )
         rng = np.random.default_rng(0)
         for i in range(N_DOCS):
             vec = "[" + ",".join(f"{x:.4f}" for x in rng.standard_normal(PGVECTOR_DIM)) + "]"
-            conn.execute(f"INSERT INTO {PGVECTOR_TABLE} VALUES (%s, %s::vector)", (i, vec))
+            conn.execute(
+                f"INSERT INTO {PGVECTOR_TABLE} VALUES (%s, %s, %s, %s::vector)", (f"doc-{i}", "test", f"本文{i}", vec)
+            )
     monkeypatch.setenv("PGDATABASE", TEST_DB)
     monkeypatch.delenv("RDS_IAM_AUTH", raising=False)
     yield
     with psycopg.connect("", dbname="postgres", autocommit=True) as admin:
         admin.execute(f"DROP DATABASE IF EXISTS {TEST_DB} WITH (FORCE)")
+
+
+class FixedEmbedder:
+    """Stands in for Titan: the same vector for any text, no AWS."""
+
+    async def embed(self, text: str) -> list[float]:
+        return [1.0] + [0.0] * (PGVECTOR_DIM - 1)
 
 
 def _connections_to_test_db() -> int:
@@ -59,7 +70,7 @@ def _connections_to_test_db() -> int:
 
 def test_pool_connects_on_the_first_search_not_at_start(test_db):
     async def run():
-        server = build_server(otel=False, retrieval="pgvector")
+        server = build_server(otel=False, retrieval="pgvector", embedder=FixedEmbedder())
         async with McpToolClient(server, trace.get_tracer("test")) as client:
             # The server is up (lifespan entered) and answers, but has not
             # touched the database yet. The wait leaves time for a pool opened
@@ -74,5 +85,7 @@ def test_pool_connects_on_the_first_search_not_at_start(test_db):
     before, result, after = asyncio.run(run())
     assert before == 0
     assert not result.is_error
-    assert len(json.loads(result.content[0].text)["document_ids"]) == 3
+    docs = json.loads(result.content[0].text)["documents"]
+    assert [d["text"] for d in docs] == [f"本文{d['id'].removeprefix('doc-')}" for d in docs]
+    assert len(docs) == 3
     assert after >= 1

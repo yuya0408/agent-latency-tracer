@@ -28,8 +28,6 @@ _PROVIDER = TracerProvider()
 _PROVIDER.add_span_processor(SimpleSpanProcessor(_EXPORTER))
 TRACER = get_tracer(_PROVIDER)
 
-SMALL_CORPUS = 1_000
-
 
 class ScriptedLlm:
     """Stands in for LlmClient: returns the next scripted response."""
@@ -68,7 +66,7 @@ def _no_tool_latency_and_clean_spans(monkeypatch):
 def _run(llm: ScriptedLlm, questions: list[str], **agent_kwargs):
     """Run the questions one after another on one agent; returns the results."""
     async def run():
-        server = build_server(otel=False, corpus_n=SMALL_CORPUS)
+        server = build_server(otel=False)
         async with McpToolClient(server, TRACER, agent_name="test") as mcp:
             agent = Agent(llm, mcp, TRACER, name="test", **agent_kwargs)
             return [await agent.run(q) for q in questions]
@@ -140,7 +138,7 @@ def test_pitfall_10_starts_every_llm_call_with_the_time():
 def _run_conversation(llm: ScriptedLlm, turns: list[tuple[str, str | None]], **agent_kwargs):
     """(question, conversation_id) pairs, run in order on one agent."""
     async def run():
-        server = build_server(otel=False, corpus_n=SMALL_CORPUS)
+        server = build_server(otel=False)
         async with McpToolClient(server, TRACER, agent_name="test") as mcp:
             agent = Agent(llm, mcp, TRACER, name="test", **agent_kwargs)
             return [await agent.run(q, conversation_id=c) for q, c in turns]

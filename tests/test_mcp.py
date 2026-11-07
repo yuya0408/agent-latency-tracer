@@ -7,7 +7,9 @@ for all its tests and clears it before each.
 from __future__ import annotations
 
 import asyncio
+import io
 import json
+import threading
 import time
 
 import pytest
@@ -17,7 +19,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from system.mcp_client import McpToolClient
-from system.mcp_server.server import RETRIEVAL_TOOL, build_server
+from system.mcp_server.server import RETRIEVAL_TOOL, _TitanEmbedder, build_server
 from system.tools import mock_server
 from tracing.instrumentation import get_tracer, invoke_agent_span
 
@@ -25,8 +27,6 @@ _EXPORTER = InMemorySpanExporter()
 _PROVIDER = TracerProvider()
 _PROVIDER.add_span_processor(SimpleSpanProcessor(_EXPORTER))
 trace.set_tracer_provider(_PROVIDER)
-
-SMALL_CORPUS = 1_000
 
 
 @pytest.fixture(autouse=True)
@@ -38,7 +38,7 @@ def _fast_mock_and_clean_spans(monkeypatch):
 
 def _with_client(coro_fn, *, otel: bool = True, pitfalls: frozenset[str] = frozenset()):
     async def run():
-        server = build_server(otel=otel, corpus_n=SMALL_CORPUS, pitfalls=pitfalls)
+        server = build_server(otel=otel, pitfalls=pitfalls)
         async with McpToolClient(server, get_tracer(_PROVIDER), agent_name="test") as client:
             return await coro_fn(client)
 
@@ -174,8 +174,32 @@ def test_retrieval_same_query_hits_same_documents():
         return a, b
 
     a, b = _with_client(two_calls)
-    assert len(_payload(a)["document_ids"]) == 3
+    docs = _payload(a)["documents"]
+    assert len(docs) == 3
+    assert all(d["text"] for d in docs)  # the articles' text, not only their ids
     assert _payload(a) == _payload(b)
+
+
+def test_titan_embedder_calls_bedrock_off_the_event_loop():
+    """invoke_model is synchronous: it must run in a worker thread, not in the
+    loop (pitfall #2's shape), and the span keeps the tokens and retries."""
+    threads = []
+
+    class FakeBedrock:
+        def invoke_model(self, **kwargs):
+            threads.append(threading.current_thread())
+            body = json.dumps({"embedding": [0.6, 0.8], "inputTextTokenCount": 7}).encode()
+            return {"body": io.BytesIO(body), "ResponseMetadata": {"RetryAttempts": 1}}
+
+    embedder = _TitanEmbedder.__new__(_TitanEmbedder)  # without making a real client
+    embedder._client = FakeBedrock()
+    assert asyncio.run(embedder.embed("出張旅費 精算")) == [0.6, 0.8]
+    assert threads and threads[0] is not threading.main_thread()
+    (span,) = [s for s in _EXPORTER.get_finished_spans() if s.name.startswith("embeddings")]
+    assert span.name == "embeddings amazon.titan-embed-text-v2:0"
+    assert span.attributes["gen_ai.operation.name"] == "embeddings"
+    assert span.attributes["gen_ai.usage.input_tokens"] == 7
+    assert span.attributes["botocore.retry_attempts"] == 1
 
 
 def test_unknown_tool_is_an_error_result():

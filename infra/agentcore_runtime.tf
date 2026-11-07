@@ -55,9 +55,13 @@ resource "aws_bedrockagentcore_agent_runtime" "mcp_server" {
     request_header_allowlist = ["traceparent", "tracestate"]
   }
 
-  # The role's policies have to exist before the runtime pulls the image
-  # and the server logs in to RDS.
-  depends_on = [aws_iam_role_policy.agentcore_runtime, aws_iam_role_policy.agentcore_runtime_rds]
+  # The role's policies have to exist before the runtime pulls the image,
+  # the server logs in to RDS and calls Bedrock.
+  depends_on = [
+    aws_iam_role_policy.agentcore_runtime,
+    aws_iam_role_policy.agentcore_runtime_rds,
+    aws_iam_role_policy.agentcore_runtime_bedrock,
+  ]
 }
 
 locals {
