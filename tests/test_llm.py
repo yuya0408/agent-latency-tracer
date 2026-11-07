@@ -211,3 +211,4 @@ def test_http_error_marks_span_and_raises():
     span = _chat_span()
     assert span.status.status_code == StatusCode.ERROR
     assert span.attributes["error.type"] == "HTTPStatusError"
+    assert "model not loaded" in span.status.description  # the server's reason, not only the status
