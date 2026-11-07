@@ -156,6 +156,7 @@ def test_span_attributes():
     assert attrs["gen_ai.usage.output_tokens"] == 40
     assert list(attrs["gen_ai.response.finish_reasons"]) == ["tool_calls"]
     assert attrs["llm.time_to_first_token_ms"] >= 0
+    assert attrs["llm.request.tool_count"] == 1
     assert attrs["llamacpp.prompt_n"] == 200
     assert attrs["llamacpp.cache_n"] == 1200
     assert attrs["llamacpp.prompt_ms"] == 2100.0

@@ -30,6 +30,7 @@ READ_TIMEOUT_S = 600.0
 # Not part of the GenAI conventions: client-side TTFT, and llama.cpp's own
 # per-request timings.
 TTFT_MS = "llm.time_to_first_token_ms"
+TOOL_COUNT = "llm.request.tool_count"  # tool definitions sent with the call
 LLAMACPP_PROMPT_N = "llamacpp.prompt_n"  # prompt tokens actually processed
 LLAMACPP_CACHE_N = "llamacpp.cache_n"  # prompt tokens reused from the cache
 LLAMACPP_PROMPT_MS = "llamacpp.prompt_ms"
@@ -122,6 +123,7 @@ class LlmClient:
         with chat_span(
             self._tracer, request_model=self._model, provider_name=self._provider_name, temperature=self._temperature
         ) as span:
+            span.set_attribute(TOOL_COUNT, len(tools))
             try:
                 return await self._stream(body, span)
             except httpx2.HTTPError as e:
