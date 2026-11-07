@@ -1,0 +1,120 @@
+<meta charset="utf-8"><title>InternalOperation (19478.0ms, 20 spans)</title><style>
+:root {
+  color-scheme: light;
+  --surface-1: #fcfcfb;
+  --surface-page: #f9f9f7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --border: rgba(11,11,11,0.10);
+  --status-critical: #d03b3b;
+  --op-invoke-agent: #2a78d6;
+  --op-retrieval: #eb6834;
+  --op-execute-tool: #1baf7a;
+  --op-chat: #eda100;
+  --op-unknown: #898781;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --surface-page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --border: rgba(255,255,255,0.10);
+    --status-critical: #e66767;
+    --op-invoke-agent: #3987e5;
+    --op-retrieval: #d95926;
+    --op-execute-tool: #199e70;
+    --op-chat: #c98500;
+    --op-unknown: #898781;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 24px;
+  background: var(--surface-page); color: var(--text-primary);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+h1 { font-size: 15px; font-weight: 600; margin: 0 0 12px; }
+.viz-root {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px; margin-bottom: 24px;
+}
+.legend { margin: 0 0 12px; }
+.legend-item {
+  display: inline-flex; align-items: center; gap: 6px; margin-right: 16px;
+  color: var(--text-secondary); font-size: 12px;
+}
+.legend-swatch { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+.gridline { stroke: var(--gridline); stroke-width: 1; }
+.axis-label { fill: var(--text-muted); font-size: 10px; }
+.row-label { fill: var(--text-primary); font-size: 12px; dominant-baseline: middle; }
+.bar-tip-label { fill: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.bar { transition: filter 0.1s ease; }
+.bar-row:hover .bar, .bar-row:focus .bar { filter: brightness(1.15); }
+.bar-row:focus { outline: none; }
+.bar-row:focus .bar { outline: 2px solid var(--text-primary); outline-offset: 1px; }
+.bar-error { stroke: var(--status-critical); stroke-width: 2px; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+th { color: var(--text-muted); font-weight: 600; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+<h1>InternalOperation (19478.0ms, 20 spans)</h1>
+<div class="viz-root">
+  <div class="legend"><span class="legend-item"><span class="legend-swatch" style="background:var(--op-unknown)"></span>unknown</span><span class="legend-item"><span class="legend-swatch" style="background:var(--op-invoke-agent)"></span>invoke_agent</span><span class="legend-item"><span class="legend-swatch" style="background:var(--op-chat)"></span>chat</span><span class="legend-item"><span class="legend-swatch" style="background:var(--op-execute-tool)"></span>execute_tool</span></div>
+  <svg width="932" height="600" role="img" aria-label="trace waterfall">
+    <line x1="260.0" y1="24" x2="260.0" y2="584" class="gridline" /><text x="260.0" y="16" class="axis-label">0.0ms</text> <line x1="420.0" y1="24" x2="420.0" y2="584" class="gridline" /><text x="420.0" y="16" class="axis-label">4870ms</text> <line x1="580.0" y1="24" x2="580.0" y2="584" class="gridline" /><text x="580.0" y="16" class="axis-label">9739ms</text> <line x1="740.0" y1="24" x2="740.0" y2="584" class="gridline" /><text x="740.0" y="16" class="axis-label">14609ms</text> <line x1="900.0" y1="24" x2="900.0" y2="584" class="gridline" /><text x="900.0" y="16" class="axis-label">19478ms</text>
+    <text x="16" y="38.0" class="row-label">InternalOperation</text><g class="bar-row" tabindex="0"><rect class="bar" x="297.6" y="24" width="602.4" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>InternalOperation
+unknown
+start +1145.5ms  duration 18332.5ms</title></rect></g><text x="30" y="66.0" class="row-label">InvokeAgentRuntime</text><g class="bar-row" tabindex="0"><rect class="bar" x="297.6" y="52" width="602.4" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>InvokeAgentRuntime
+unknown
+start +1145.5ms  duration 18332.5ms</title></rect></g><text x="44" y="94.0" class="row-label">AgentCore.Runtime.Invoke</text><g class="bar-row" tabindex="0"><rect class="bar" x="260.0" y="80" width="598.1" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>AgentCore.Runtime.Invoke
+unknown
+start +0.0ms  duration 18204.0ms</title></rect><text x="864.1" y="94.0" class="bar-tip-label">18204ms</text></g><text x="58" y="122.0" class="row-label">invoke_agent agent</text><g class="bar-row" tabindex="0"><rect class="bar" x="262.1" y="108" width="596.0" height="20" rx="4" ry="4" fill="var(--op-invoke-agent)"><title>invoke_agent agent
+invoke_agent
+start +63.5ms  duration 18137.6ms</title></rect><text x="864.0" y="122.0" class="bar-tip-label">18138ms</text></g><text x="72" y="150.0" class="row-label">chat Qwen/Qwen3-8B</text><g class="bar-row" tabindex="0"><rect class="bar" x="262.1" y="136" width="221.5" height="20" rx="4" ry="4" fill="var(--op-chat)"><title>chat Qwen/Qwen3-8B
+chat
+start +63.6ms  duration 6739.8ms</title></rect><text x="489.5" y="150.0" class="bar-tip-label">6740ms</text></g><text x="86" y="178.0" class="row-label">llm_request</text><g class="bar-row" tabindex="0"><rect class="bar" x="262.3" y="164" width="221.2" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>llm_request
+unknown
+start +69.4ms  duration 6732.8ms</title></rect><text x="489.5" y="178.0" class="bar-tip-label">6733ms</text></g><text x="72" y="206.0" class="row-label">execute_tool find_sales_order</text><g class="bar-row" tabindex="0"><rect class="bar" x="483.5" y="192" width="26.1" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>execute_tool find_sales_order
+execute_tool
+start +6803.6ms  duration 794.2ms</title></rect><text x="515.6" y="206.0" class="bar-tip-label">794ms</text></g><text x="86" y="234.0" class="row-label">MCP send tools/call find_sales_order</text><g class="bar-row" tabindex="0"><rect class="bar" x="483.6" y="220" width="26.1" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>MCP send tools/call find_sales_order
+unknown
+start +6803.8ms  duration 793.8ms</title></rect><text x="515.6" y="234.0" class="bar-tip-label">794ms</text></g><text x="100" y="262.0" class="row-label">AgentCore.Runtime.Invoke</text><g class="bar-row" tabindex="0"><rect class="bar" x="484.7" y="248" width="24.3" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>AgentCore.Runtime.Invoke
+unknown
+start +6838.0ms  duration 741.0ms</title></rect><text x="515.0" y="262.0" class="bar-tip-label">741ms</text></g><text x="114" y="290.0" class="row-label">POST /mcp</text><g class="bar-row" tabindex="0"><rect class="bar" x="486.4" y="276" width="22.6" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>POST /mcp
+unknown
+start +6889.0ms  duration 687.1ms</title></rect><text x="514.9" y="290.0" class="bar-tip-label">687ms</text></g><text x="128" y="318.0" class="row-label">tools/list</text><g class="bar-row" tabindex="0"><rect class="bar" x="486.4" y="304" width="2.0" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>tools/list
+unknown
+start +6889.6ms  duration 1.3ms</title></rect><text x="494.4" y="318.0" class="bar-tip-label">1.3ms</text></g><text x="100" y="346.0" class="row-label">tools/call find_sales_order</text><g class="bar-row" tabindex="0"><rect class="bar" x="486.4" y="332" width="22.5" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>tools/call find_sales_order
+execute_tool
+start +6891.7ms  duration 683.5ms</title></rect><text x="514.9" y="346.0" class="bar-tip-label">683ms</text></g><text x="72" y="374.0" class="row-label">execute_tool find_stock_balance</text><g class="bar-row" tabindex="0"><rect class="bar" x="483.6" y="360" width="16.9" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>execute_tool find_stock_balance
+execute_tool
+start +6803.9ms  duration 513.6ms</title></rect><text x="506.4" y="374.0" class="bar-tip-label">514ms</text></g><text x="86" y="402.0" class="row-label">MCP send tools/call find_stock_balance</text><g class="bar-row" tabindex="0"><rect class="bar" x="483.6" y="388" width="16.9" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>MCP send tools/call find_stock_balance
+unknown
+start +6804.0ms  duration 513.3ms</title></rect><text x="506.4" y="402.0" class="bar-tip-label">513ms</text></g><text x="100" y="430.0" class="row-label">AgentCore.Runtime.Invoke</text><g class="bar-row" tabindex="0"><rect class="bar" x="484.3" y="416" width="15.5" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>AgentCore.Runtime.Invoke
+unknown
+start +6827.0ms  duration 471.0ms</title></rect><text x="505.8" y="430.0" class="bar-tip-label">471ms</text></g><text x="114" y="458.0" class="row-label">POST /mcp</text><g class="bar-row" tabindex="0"><rect class="bar" x="485.6" y="444" width="14.1" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>POST /mcp
+unknown
+start +6864.5ms  duration 429.4ms</title></rect><text x="505.7" y="458.0" class="bar-tip-label">429ms</text></g><text x="128" y="486.0" class="row-label">tools/list</text><g class="bar-row" tabindex="0"><rect class="bar" x="485.6" y="472" width="2.0" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>tools/list
+unknown
+start +6865.2ms  duration 2.0ms</title></rect><text x="493.6" y="486.0" class="bar-tip-label">2.0ms</text></g><text x="100" y="514.0" class="row-label">tools/call find_stock_balance</text><g class="bar-row" tabindex="0"><rect class="bar" x="485.7" y="500" width="14.0" height="20" rx="4" ry="4" fill="var(--op-execute-tool)"><title>tools/call find_stock_balance
+execute_tool
+start +6867.9ms  duration 425.2ms</title></rect><text x="505.6" y="514.0" class="bar-tip-label">425ms</text></g><text x="72" y="542.0" class="row-label">chat Qwen/Qwen3-8B</text><g class="bar-row" tabindex="0"><rect class="bar" x="509.7" y="528" width="348.4" height="20" rx="4" ry="4" fill="var(--op-chat)"><title>chat Qwen/Qwen3-8B
+chat
+start +7598.0ms  duration 10603.1ms</title></rect><text x="864.0" y="542.0" class="bar-tip-label">10603ms</text></g><text x="86" y="570.0" class="row-label">llm_request</text><g class="bar-row" tabindex="0"><rect class="bar" x="509.9" y="556" width="348.1" height="20" rx="4" ry="4" fill="var(--op-unknown)"><title>llm_request
+unknown
+start +7604.7ms  duration 10595.3ms</title></rect><text x="864.0" y="570.0" class="bar-tip-label">10595ms</text></g>
+  </svg>
+</div>
+<div class="viz-root">
+  <table>
+    <thead><tr><th>span</th><th>operation</th><th class="num">start (ms)</th><th class="num">duration (ms)</th></tr></thead>
+    <tbody><tr><td style="padding-left: calc(10px + 0 * 14px)">InternalOperation</td><td>unknown</td><td class="num">1145.5</td><td class="num">18332.5</td></tr><tr><td style="padding-left: calc(10px + 1 * 14px)">InvokeAgentRuntime</td><td>unknown</td><td class="num">1145.5</td><td class="num">18332.5</td></tr><tr><td style="padding-left: calc(10px + 2 * 14px)">AgentCore.Runtime.Invoke</td><td>unknown</td><td class="num">0.0</td><td class="num">18204.0</td></tr><tr><td style="padding-left: calc(10px + 3 * 14px)">invoke_agent agent</td><td>invoke_agent</td><td class="num">63.5</td><td class="num">18137.6</td></tr><tr><td style="padding-left: calc(10px + 4 * 14px)">chat Qwen/Qwen3-8B</td><td>chat</td><td class="num">63.6</td><td class="num">6739.8</td></tr><tr><td style="padding-left: calc(10px + 5 * 14px)">llm_request</td><td>unknown</td><td class="num">69.4</td><td class="num">6732.8</td></tr><tr><td style="padding-left: calc(10px + 4 * 14px)">execute_tool find_sales_order</td><td>execute_tool</td><td class="num">6803.6</td><td class="num">794.2</td></tr><tr><td style="padding-left: calc(10px + 5 * 14px)">MCP send tools/call find_sales_order</td><td>unknown</td><td class="num">6803.8</td><td class="num">793.8</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">AgentCore.Runtime.Invoke</td><td>unknown</td><td class="num">6838.0</td><td class="num">741.0</td></tr><tr><td style="padding-left: calc(10px + 7 * 14px)">POST /mcp</td><td>unknown</td><td class="num">6889.0</td><td class="num">687.1</td></tr><tr><td style="padding-left: calc(10px + 8 * 14px)">tools/list</td><td>unknown</td><td class="num">6889.6</td><td class="num">1.3</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">tools/call find_sales_order</td><td>execute_tool</td><td class="num">6891.7</td><td class="num">683.5</td></tr><tr><td style="padding-left: calc(10px + 4 * 14px)">execute_tool find_stock_balance</td><td>execute_tool</td><td class="num">6803.9</td><td class="num">513.6</td></tr><tr><td style="padding-left: calc(10px + 5 * 14px)">MCP send tools/call find_stock_balance</td><td>unknown</td><td class="num">6804.0</td><td class="num">513.3</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">AgentCore.Runtime.Invoke</td><td>unknown</td><td class="num">6827.0</td><td class="num">471.0</td></tr><tr><td style="padding-left: calc(10px + 7 * 14px)">POST /mcp</td><td>unknown</td><td class="num">6864.5</td><td class="num">429.4</td></tr><tr><td style="padding-left: calc(10px + 8 * 14px)">tools/list</td><td>unknown</td><td class="num">6865.2</td><td class="num">2.0</td></tr><tr><td style="padding-left: calc(10px + 6 * 14px)">tools/call find_stock_balance</td><td>execute_tool</td><td class="num">6867.9</td><td class="num">425.2</td></tr><tr><td style="padding-left: calc(10px + 4 * 14px)">chat Qwen/Qwen3-8B</td><td>chat</td><td class="num">7598.0</td><td class="num">10603.1</td></tr><tr><td style="padding-left: calc(10px + 5 * 14px)">llm_request</td><td>unknown</td><td class="num">7604.7</td><td class="num">10595.3</td></tr></tbody>
+  </table>
+</div>
