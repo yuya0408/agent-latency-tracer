@@ -36,10 +36,13 @@ class ScriptedLlm:
         self._responses = list(responses)
         self.requests: list[list[dict]] = []  # the messages sent on each call
 
-    async def chat(self, messages: list[dict], tools: list[dict]) -> ChatResult:
+    async def chat(self, messages: list[dict], tools: list[dict], on_text=None) -> ChatResult:
         self.requests.append(list(messages))
         with chat_span(TRACER, request_model="scripted", provider_name="test"):
-            return self._responses.pop(0)
+            response = self._responses.pop(0)
+            if on_text and response.content:
+                on_text(response.content)
+            return response
 
 
 def _call(call_id: str, name: str, arguments: dict | str) -> dict:
@@ -63,13 +66,13 @@ def _no_tool_latency_and_clean_spans(monkeypatch):
     _EXPORTER.clear()
 
 
-def _run(llm: ScriptedLlm, questions: list[str], **agent_kwargs):
+def _run(llm: ScriptedLlm, questions: list[str], on_text=None, **agent_kwargs):
     """Run the questions one after another on one agent; returns the results."""
     async def run():
         server = build_server(otel=False)
         async with McpToolClient(server, TRACER, agent_name="test") as mcp:
             agent = Agent(llm, mcp, TRACER, name="test", **agent_kwargs)
-            return [await agent.run(q) for q in questions]
+            return [await agent.run(q, on_text=on_text) for q in questions]
 
     return asyncio.run(run())
 
@@ -89,6 +92,16 @@ def test_stops_when_llm_answers():
     tool_message = llm.requests[1][-1]
     assert tool_message["tool_call_id"] == "c1"
     assert json.loads(tool_message["content"])["status"] == "ok"
+
+
+def test_text_from_every_llm_call_goes_to_on_text():
+    asks_with_text = ChatResult(
+        content="検索します。", tool_calls=[_call("c1", "find_records", {"type": "item"})], finish_reason="tool_calls"
+    )
+    llm = ScriptedLlm([asks_with_text, _answers("品目は4件です。")])
+    pieces: list[str] = []
+    _run(llm, ["品目は何件?"], on_text=pieces.append)
+    assert pieces == ["検索します。", "品目は4件です。"]
 
 
 def test_tool_calls_in_one_response_run_concurrently(monkeypatch):
@@ -223,3 +236,38 @@ def test_tool_list_is_fetched_once(monkeypatch):
     monkeypatch.setattr(McpToolClient, "list_tools", counting)
     _run(ScriptedLlm([_answers("a"), _answers("b")]), ["q1", "q2"])
     assert fetched == 1
+
+
+def test_time_to_first_text_goes_on_the_invoke_agent_span():
+    _run(ScriptedLlm([_answers("品目は4件です。")]), ["品目は何件?"], on_text=lambda text: None)
+    (root,) = _spans("invoke_agent")
+    assert root.attributes["agent.time_to_first_text_ms"] >= 0
+
+
+def test_no_time_to_first_text_without_on_text():
+    _run(ScriptedLlm([_answers("品目は4件です。")]), ["品目は何件?"])
+    (root,) = _spans("invoke_agent")
+    assert "agent.time_to_first_text_ms" not in root.attributes
+
+
+class StuckLlm:
+    """Never answers, like a long generation the caller gives up on."""
+
+    async def chat(self, messages: list[dict], tools: list[dict], on_text=None) -> ChatResult:
+        await asyncio.sleep(3600)
+
+
+def test_a_cancelled_run_marks_its_span():
+    async def run():
+        server = build_server(otel=False)
+        async with McpToolClient(server, TRACER, agent_name="test") as mcp:
+            task = asyncio.create_task(Agent(StuckLlm(), mcp, TRACER, name="test").run("q"))
+            await asyncio.sleep(0.1)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+    asyncio.run(run())
+    (root,) = _spans("invoke_agent")
+    assert root.status.status_code == StatusCode.ERROR
+    assert root.attributes["error.type"] == "cancelled"

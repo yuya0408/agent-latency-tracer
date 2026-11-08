@@ -14,7 +14,8 @@ same response overlap in time, which is how the trace shows they ran
 concurrently.
 """
 from __future__ import annotations
-import asyncio, json
+import asyncio, json, time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -31,6 +32,8 @@ MAX_TURNS = 10
 # Strands Agents' default conversation manager keeps the last 40 messages
 # (SlidingWindowConversationManager(window_size=40)).
 HISTORY_WINDOW = 40
+# Not part of the GenAI conventions: when the first piece of text was passed on.
+TIME_TO_FIRST_TEXT_MS = "agent.time_to_first_text_ms"
 
 
 @dataclass
@@ -73,32 +76,58 @@ class Agent:
         self._tools: list[dict[str, Any]] | None = None
         self._histories: dict[str, list[dict[str, Any]]] = {}
 
-    async def run(self, question: str, *, conversation_id: str | None = None) -> AgentResult:
+    async def run(
+        self, question: str, *, conversation_id: str | None = None, on_text: Callable[[str], None] | None = None
+    ) -> AgentResult:
         """With a conversation_id, the question continues that conversation;
         without one, it starts a new conversation that is not kept. A run that
-        fails (an exception) leaves the conversation as it was."""
+        fails (an exception) leaves the conversation as it was.
+
+        on_text gets the LLM's text as it is written, from every LLM call: a
+        call that asks for tools may write a little first ("I'll search..."),
+        which a chat that streams would show as well."""
         history = self._histories.get(conversation_id, []) if conversation_id else []
         messages: list[dict[str, Any]] = [*history, {"role": "user", "content": question}]
-        result = await self._run(messages, conversation_id)
+        result = await self._run(messages, conversation_id, on_text)
         if conversation_id:
             self._histories[conversation_id] = _last_turns(messages, HISTORY_WINDOW)
         return result
 
-    async def _run(self, messages: list[dict[str, Any]], conversation_id: str | None) -> AgentResult:
+    async def _run(
+        self, messages: list[dict[str, Any]], conversation_id: str | None, on_text: Callable[[str], None] | None
+    ) -> AgentResult:
         with invoke_agent_span(self._tracer, agent_name=self._name, conversation_id=conversation_id) as span:
             trace_id = f"{span.get_span_context().trace_id:032x}"
-            if self._tools is None:  # first run only, so it shows up in that run's trace
-                self._tools = to_openai_tools(await self._mcp.list_tools())
-            for turn in range(1, self._max_turns + 1):
-                result = await self._llm.chat(self._with_time(messages), self._tools)
-                messages.append(result.as_message())
-                if not result.tool_calls:
-                    return AgentResult(result.content, messages, turn, "answer", trace_id)
-                if self._sequential_tools:
-                    for c in result.tool_calls:
-                        messages.append(await self._call_tool(c))
-                else:
-                    messages.extend(await asyncio.gather(*(self._call_tool(c) for c in result.tool_calls)))
+            start = time.perf_counter()
+            first_text_seen = False
+
+            def on_text_timed(text: str) -> None:
+                # When the first piece left the agent: set against the caller's
+                # time to the first piece, it shows whether the platform held
+                # the stream back on the way.
+                nonlocal first_text_seen
+                if not first_text_seen:
+                    first_text_seen = True
+                    span.set_attribute(TIME_TO_FIRST_TEXT_MS, (time.perf_counter() - start) * 1000)
+                on_text(text)
+
+            try:
+                if self._tools is None:  # first run only, so it shows up in that run's trace
+                    self._tools = to_openai_tools(await self._mcp.list_tools())
+                for turn in range(1, self._max_turns + 1):
+                    result = await self._llm.chat(self._with_time(messages), self._tools, on_text and on_text_timed)
+                    messages.append(result.as_message())
+                    if not result.tool_calls:
+                        return AgentResult(result.content, messages, turn, "answer", trace_id)
+                    if self._sequential_tools:
+                        for c in result.tool_calls:
+                            messages.append(await self._call_tool(c))
+                    else:
+                        messages.extend(await asyncio.gather(*(self._call_tool(c) for c in result.tool_calls)))
+            except asyncio.CancelledError:
+                # The span would otherwise end as if the run went fine.
+                mark_error(span, "cancelled", "the caller went away")
+                raise
             mark_error(span, "max_turns_exceeded")
             return AgentResult("", messages, self._max_turns, "max_turns", trace_id)
 
