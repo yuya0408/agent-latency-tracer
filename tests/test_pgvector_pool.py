@@ -1,5 +1,5 @@
-"""The pgvector retriever opens its connection pool on the first search, not
-when the server starts (system/mcp_server/server.py, _PgvectorRetriever).
+"""The pgvector retriever opens its connection pool on the first tools/list,
+not when the server starts (system/mcp_server/server.py, _PgvectorRetriever).
 
 Needs a PostgreSQL with the pgvector extension available, reached through the
 libpq environment variables (PGHOST, PGUSER, ...), and the `rds` extra. The
@@ -68,24 +68,27 @@ def _connections_to_test_db() -> int:
         return admin.execute("SELECT count(*) FROM pg_stat_activity WHERE datname = %s", (TEST_DB,)).fetchone()[0]
 
 
-def test_pool_connects_on_the_first_search_not_at_start(test_db):
+def test_pool_connects_on_the_tool_list_not_at_start(test_db):
     async def run():
         server = build_server(otel=False, retrieval="pgvector", embedder=FixedEmbedder())
         async with McpToolClient(server, trace.get_tracer("test")) as client:
-            # The server is up (lifespan entered) and answers, but has not
+            # The server is up (lifespan entered, initialized) but has not
             # touched the database yet. The wait leaves time for a pool opened
             # at start-up, which connects in the background, to show up.
+            await asyncio.sleep(1.0)
+            at_start = _connections_to_test_db()
+            # The tool list opens the pool; the connections come in the
+            # background, ready before the first search.
             await client.list_tools()
             await asyncio.sleep(1.0)
-            before = _connections_to_test_db()
+            after_list = _connections_to_test_db()
             result = await client.call_tool(RETRIEVAL_TOOL, {"query": "返品の手順", "top_k": 3})
-            after = _connections_to_test_db()
-        return before, result, after
+        return at_start, after_list, result
 
-    before, result, after = asyncio.run(run())
-    assert before == 0
+    at_start, after_list, result = asyncio.run(run())
+    assert at_start == 0
+    assert after_list >= 1
     assert not result.is_error
     docs = json.loads(result.content[0].text)["documents"]
     assert [d["text"] for d in docs] == [f"本文{d['id'].removeprefix('doc-')}" for d in docs]
     assert len(docs) == 3
-    assert after >= 1

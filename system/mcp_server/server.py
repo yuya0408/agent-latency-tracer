@@ -104,6 +104,9 @@ class _Retriever:
         self._index = build_flat_index(generate_corpus(n=len(self._chunks)))
         self._queries = generate_queries(N_QUERY_VECTORS)
 
+    async def warm(self, ctx: ServerRequestContext) -> None:
+        pass  # nothing to connect to
+
     async def retrieve(self, ctx: ServerRequestContext, query: str, top_k: int) -> list[dict[str, Any]]:
         vector = self._queries[zlib.crc32(query.encode("utf-8")) % N_QUERY_VECTORS]
         # Synchronous faiss call inside the event loop: well under 1ms for a
@@ -179,9 +182,9 @@ class _PgvectorRetriever:
     made per connection.
 
     The pool is made once per process in the server's lifespan, opened on the
-    first search, and reached through ctx.lifespan_context. Async, so a search
-    doesn't hold up the event loop, and pooled, so concurrent tool calls don't
-    queue on one connection."""
+    first tools/list (or the first search, whichever comes first), and reached
+    through ctx.lifespan_context. Async, so a search doesn't hold up the event
+    loop, and pooled, so concurrent tool calls don't queue on one connection."""
 
     def __init__(self, embedder: Embedder) -> None:
         self._embedder = embedder
@@ -194,9 +197,9 @@ class _PgvectorRetriever:
 
         # The pool calls kwargs for every new connection, so tokens don't expire on it.
         kwargs = _RdsIamToken() if os.environ.get("RDS_IAM_AUTH") == "1" else None
-        # open=False: no connections until the first search. AgentCore starts
-        # the process before it assigns a session, and connections made then
-        # were reset at their first use after the assignment (2026-11-06).
+        # open=False: no connections until a request comes in (warm). AgentCore
+        # starts the process before it assigns a session, and connections made
+        # then were reset at their first use after the assignment (2026-11-06).
         # check: test each connection before handing it out, for one that
         # dies while it sits unused in the pool.
         pool = AsyncConnectionPool(
@@ -208,11 +211,18 @@ class _PgvectorRetriever:
         finally:
             await pool.close()
 
+    async def warm(self, ctx: ServerRequestContext) -> None:
+        """Open the pool without waiting for its connections, which the pool
+        makes in the background. The agent asks for the tool list at the start
+        of a session's first question, a model call (about 2 s) before any
+        search, so the connections (about 1 s each on RDS with IAM auth,
+        2026-11-08) are ready by then instead of being waited for in the search."""
+        await ctx.lifespan_context["pool"].open()  # does nothing once the pool is open
+
     async def retrieve(self, ctx: ServerRequestContext, query: str, top_k: int) -> list[dict[str, Any]]:
         vector = np.asarray(await self._embedder.embed(query), dtype=np.float32)
-        pool = ctx.lifespan_context["pool"]
-        await pool.open()  # does nothing once the pool is open
-        async with pool.connection() as conn:
+        await self.warm(ctx)  # in case no tools/list came first
+        async with ctx.lifespan_context["pool"].connection() as conn:
             info = conn.info
             with db_query_span(
                 _tracer, system="postgresql", operation="SELECT", collection=PGVECTOR_TABLE,
@@ -264,6 +274,7 @@ def build_server(
     async def on_list_tools(
         ctx: ServerRequestContext, params: types.PaginatedRequestParams | None
     ) -> types.ListToolsResult:
+        await retriever.warm(ctx)
         return types.ListToolsResult(tools=[*tools, _RETRIEVAL_TOOL_DEF])
 
     async def on_call_tool(
