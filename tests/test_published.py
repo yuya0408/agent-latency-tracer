@@ -66,3 +66,8 @@ def test_mask_replaces_account_ids_and_arns_left_in_kept_values():
 def test_mask_leaves_numbers_alone():
     doc = _otel_document(attributes={"vllm.generation_time_ms": 8941.123456789012})
     assert mask_span(from_otel_document(doc))["attributes"] == {"vllm.generation_time_ms": 8941.123456789012}
+
+
+def test_mask_keeps_the_retry_count_on_the_embeddings_span():
+    doc = _otel_document(attributes={"botocore.retry_attempts": 0})
+    assert mask_span(from_otel_document(doc))["attributes"] == {"botocore.retry_attempts": 0}
