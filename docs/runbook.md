@@ -322,7 +322,8 @@
   ([Optimize your agent for V2](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-v2-optimize.html))。
   今回のRuntimeはV1(初期値)で、V1が前もってコンテナを起動して止めておくことの公式の記述は見つけていない
 - 判断: 直す(500を返した失敗、7.6〜8.5秒)。修正後に残る接続づくりの約1秒は記録のみ(1問の2.5〜10%、新しいセッションの最初だけ)。
-  検索を使う最短の質問が5秒以下なら20%を超えるので、GPUの回で確かめて見直す
+  検索を使うのは6問目「出張旅費の精算のルールは?」だけで、これまで16.2秒(答えが長い回は50.5秒)。20%を超えるには5秒以下が要る。
+  基準の回ではこの質問がセッションで最初の検索になるので、GPUの回の値で確かめる
 - 修正: プールは`open=False`で作り、最初の検索で開く([system/mcp_server/server.py](../system/mcp_server/server.py))。
   `check`は、使わずに置いている間に切れた接続への守りとして残す。テストは[tests/test_pgvector_pool.py](../tests/test_pgvector_pool.py)
   (起動しただけでは接続が0本)
