@@ -66,12 +66,12 @@ def _sse(chunks: list[dict]) -> bytes:
     return ("".join(lines) + "data: [DONE]\n\n").encode()
 
 
-def _chat(handler, **client_kwargs):
+def _chat(handler, on_text=None, **client_kwargs):
     """Run one chat call against `handler`; returns the result."""
     async def run():
         http = httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
         async with LlmClient(get_tracer(_PROVIDER), http=http, **client_kwargs) as client:
-            return await client.chat([{"role": "user", "content": "在庫は?"}], to_openai_tools([TOOL]))
+            return await client.chat([{"role": "user", "content": "在庫は?"}], to_openai_tools([TOOL]), on_text)
 
     return asyncio.run(run())
 
@@ -145,6 +145,18 @@ def test_text_answer_has_no_tool_calls():
     assert result.content == "在庫は120個です。"
     assert result.finish_reason == "stop"
     assert "tool_calls" not in result.as_message()
+
+
+def test_text_goes_to_on_text_piece_by_piece():
+    pieces: list[str] = []
+    _chat(_streaming(TEXT_CHUNKS), on_text=pieces.append)
+    assert pieces == ["在庫は", "120個です。"]
+
+
+def test_tool_calls_do_not_go_to_on_text():
+    pieces: list[str] = []
+    _chat(_streaming(TOOL_CALL_CHUNKS), on_text=pieces.append)
+    assert pieces == []
 
 
 def test_span_attributes():

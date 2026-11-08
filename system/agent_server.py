@@ -5,6 +5,11 @@ Each invocation takes {"question": "..."} and runs the agent once. It joins the
 caller's trace when the request carries a traceparent, so the platform's span
 and the agent's sit in one trace.
 
+With `Accept: text/event-stream` the answer comes back as server-sent events
+while the LLM writes it, as a chat that streams shows it: {"text": "..."} for
+each piece, then one {"answer", "turns", "stop_reason", "trace_id"} event (or
+{"error": "..."}). Without it, the reply is one JSON object at the end.
+
 Environment variables:
   LLM_BASE_URL       OpenAI-compatible server (default: the local llama.cpp)
   LLM_MODEL          model name to request
@@ -15,19 +20,19 @@ Environment variables:
   PITFALLS           cases switched on in the agent (system/pitfalls.py)
 """
 from __future__ import annotations
-import os
-from collections.abc import AsyncIterator
+import asyncio, json, os
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 import uvicorn
 from opentelemetry import context, propagate
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, StreamingResponse
 from starlette.routing import Route
 
 from system import pitfalls
-from system.agent import Agent
+from system.agent import Agent, AgentResult
 from system.llm.client import DEFAULT_BASE_URL, DEFAULT_MODEL, DEFAULT_PROVIDER_NAME, LlmClient
 from system.mcp_client import McpToolClient
 from tracing.exporter import exporters_from_env
@@ -36,28 +41,77 @@ from tracing.instrumentation import build_tracer_provider, get_tracer, set_globa
 HOST = os.environ.get("AGENT_SERVER_HOST", "127.0.0.1")
 PORT = 8080  # AgentCore Runtime expects HTTP agents on 8080
 SESSION_HEADER = "x-amzn-bedrock-agentcore-runtime-session-id"
+# How long a streamed answer may go without sending anything. Common proxy
+# idle timeouts are a minute or more (nginx's proxy_read_timeout: 60 s).
+PING_INTERVAL_S = 15.0
 
 
 async def ping(request: Request) -> JSONResponse:
     return JSONResponse({"status": "Healthy"})
 
 
-async def invocations(request: Request) -> JSONResponse:
-    try:
-        question = (await request.json())["question"]
-    except (ValueError, KeyError, TypeError):
-        return JSONResponse({"error": 'expected a JSON body with "question"'}, status_code=400)
-    token = context.attach(propagate.extract(request.headers))
-    try:
-        result = await request.app.state.agent.run(question, conversation_id=request.headers.get(SESSION_HEADER))
-    finally:
-        context.detach(token)
-    return JSONResponse({
+def _summary(result: AgentResult) -> dict:
+    return {
         "answer": result.answer,
         "turns": result.turns,
         "stop_reason": result.stop_reason,
         "trace_id": result.trace_id,
-    })
+    }
+
+
+def _event(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+async def invocations(request: Request) -> JSONResponse | StreamingResponse:
+    try:
+        question = (await request.json())["question"]
+    except (ValueError, KeyError, TypeError):
+        return JSONResponse({"error": 'expected a JSON body with "question"'}, status_code=400)
+    agent = request.app.state.agent
+    caller = propagate.extract(request.headers)
+    conversation_id = request.headers.get(SESSION_HEADER)
+
+    async def run(on_text=None):
+        # Attached inside the task that runs the agent, so the spans join the
+        # caller's trace however the response is sent.
+        token = context.attach(caller)
+        try:
+            return await agent.run(question, conversation_id=conversation_id, on_text=on_text)
+        finally:
+            context.detach(token)
+
+    if "text/event-stream" not in request.headers.get("accept", ""):
+        return JSONResponse(_summary(await run()))
+    return StreamingResponse(_events(run), media_type="text/event-stream")
+
+
+async def _events(run: Callable[[Callable[[str], None]], Awaitable[AgentResult]]) -> AsyncIterator[str]:
+    """The agent's text as it comes, then the summary (or the error). The
+    status (200) is sent before the agent finishes, so a failure can only go in
+    the stream; the agent's own span records it."""
+    pieces: asyncio.Queue[str] = asyncio.Queue()
+    task = asyncio.create_task(run(pieces.put_nowait))
+    try:
+        while not (task.done() and pieces.empty()):
+            getter = asyncio.ensure_future(pieces.get())
+            await asyncio.wait({getter, task}, timeout=PING_INTERVAL_S, return_when=asyncio.FIRST_COMPLETED)
+            if getter.done():
+                yield _event({"text": getter.result()})
+            else:
+                getter.cancel()
+                if not task.done():
+                    # Nothing to send while tools run (tens of seconds): a
+                    # comment line keeps proxies from closing an idle stream.
+                    yield ": ping\n\n"
+        try:
+            yield _event(_summary(task.result()))
+        except Exception as e:
+            yield _event({"error": f"{type(e).__name__}: {e}"})
+    finally:
+        # The caller went away: stop the agent rather than leave it using
+        # the GPU for nobody (as the duplicated question did, docs/runbook.md).
+        task.cancel()
 
 
 @asynccontextmanager

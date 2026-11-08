@@ -11,6 +11,7 @@ the model (network, queueing).
 """
 from __future__ import annotations
 import json, time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -109,7 +110,14 @@ class LlmClient:
     async def __aexit__(self, *exc_info: Any) -> None:
         await self._http.aclose()
 
-    async def chat(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> ChatResult:
+    async def chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        on_text: Callable[[str], None] | None = None,
+    ) -> ChatResult:
+        """`on_text` is called with each piece of text as it arrives, for passing
+        the answer on to the user while it is still being written."""
         body = {
             "model": self._model,
             "messages": messages,
@@ -125,12 +133,14 @@ class LlmClient:
         ) as span:
             span.set_attribute(TOOL_COUNT, len(tools))
             try:
-                return await self._stream(body, span)
+                return await self._stream(body, span, on_text)
             except httpx2.HTTPError as e:
                 mark_error(span, type(e).__name__, str(e))
                 raise
 
-    async def _stream(self, body: dict[str, Any], span: trace.Span) -> ChatResult:
+    async def _stream(
+        self, body: dict[str, Any], span: trace.Span, on_text: Callable[[str], None] | None
+    ) -> ChatResult:
         start = time.perf_counter()
         content: list[str] = []
         calls: dict[int, dict[str, Any]] = {}  # tool calls arrive in pieces, keyed by index
@@ -163,6 +173,8 @@ class LlmClient:
                         span.set_attribute(TTFT_MS, (time.perf_counter() - start) * 1000)
                     if delta.get("content"):
                         content.append(delta["content"])
+                        if on_text:
+                            on_text(delta["content"])
                     for piece in delta.get("tool_calls", []):
                         call = calls.setdefault(
                             piece["index"], {"id": "", "type": "function", "function": {"name": "", "arguments": ""}}

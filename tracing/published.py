@@ -18,6 +18,8 @@ from typing import Any
 _KEEP_PREFIXES = ("gen_ai.", "mcp.", "vllm.", "llamacpp.", "llm.", "db.")
 _KEEP_KEYS = frozenset({
     "botocore.retry_attempts",
+    "caller.time_to_first_text_ms",
+    "agent.time_to_first_text_ms",
     "error.type",
     "jsonrpc.request.id",
     "latency_ms",

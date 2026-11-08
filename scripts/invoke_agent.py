@@ -8,7 +8,10 @@ With --concurrent, the questions are sent at the same time (pitfall #12,
 queueing in the inference server), e.g. `--concurrent 1 2 3 4 5 6`.
 
 Each call sits in a `caller` span of its own, whose traceparent goes with the
-request, so the platform's spans and the agent's join that trace. The spans go
+request, so the platform's spans and the agent's join that trace. The answer
+is streamed (server-sent events, system/agent_server.py), as a chat shows it;
+the time until its first piece arrives goes on that span as
+caller.time_to_first_text_ms and in the report as "shown after". The spans go
 to CloudWatch (needs the "aws" extra, AWS credentials and Transaction Search on,
 infra/account/).
 
@@ -36,6 +39,9 @@ from scripts.run_agent import QUESTIONS
 from tracing.aws_exporter import cloudwatch_span_exporter
 from tracing.instrumentation import build_tracer_provider, get_tracer
 
+
+# Not part of any convention: when the user would see the answer start.
+TIME_TO_FIRST_TEXT_MS = "caller.time_to_first_text_ms"
 
 # Sent first on each session and left out of the measurements: it starts the
 # agent's process, its MCP connection and tool list, and puts the tool
@@ -69,11 +75,29 @@ def main(numbers: list[int], concurrent: bool, cold: bool) -> None:
                     agentRuntimeArn=arn,
                     runtimeSessionId=session_id,
                     contentType="application/json",
-                    accept="application/json",
+                    accept="text/event-stream",
                     payload=json.dumps({"question": question}, ensure_ascii=False).encode(),
                     traceParent=carrier["traceparent"],
                 )
-                body = json.loads(response["response"].read())
+                body: dict = {}
+                first_text_s = None
+                # One byte at a time, so a piece is seen when it arrives rather
+                # than when enough bytes for a bigger read have come in.
+                for line in response["response"].iter_lines(chunk_size=1):
+                    if not line.startswith(b"data: "):
+                        continue
+                    event = json.loads(line[len(b"data: "):])
+                    if "text" in event:
+                        if first_text_s is None:
+                            first_text_s = time.perf_counter() - start
+                            span.set_attribute(TIME_TO_FIRST_TEXT_MS, first_text_s * 1000)
+                    else:
+                        body = event
+                if "error" in body:
+                    raise RuntimeError(f"the agent failed: {body['error']}")
+                if "answer" not in body:
+                    # Cut off on the way: the HTTP status said 200 at the start.
+                    raise RuntimeError("the stream ended without the summary event")
             except Exception as e:
                 # A failed question (e.g. the prompt outgrew vLLM's context)
                 # is a result too: report it and go on to the next one. The
@@ -88,9 +112,10 @@ def main(numbers: list[int], concurrent: bool, cold: bool) -> None:
                 ])
             elapsed = time.perf_counter() - start
         # The agent reports the trace it ran in, which should be this one.
+        shown = "no text" if first_text_s is None else f"shown after {first_text_s:.1f}s"
         return "\n".join([
             f"--- {label}: {question}",
-            f"{elapsed:.1f}s, {body.get('turns')} LLM calls, stopped: {body.get('stop_reason')}",
+            f"{elapsed:.1f}s ({shown}), {body.get('turns')} LLM calls, stopped: {body.get('stop_reason')}",
             json.dumps(body.get("answer"), ensure_ascii=False),
             f"trace {trace_id}" + ("" if body.get("trace_id") == trace_id else f" (agent: {body.get('trace_id')})"),
         ])
