@@ -74,6 +74,11 @@ DB_RETURNED_ROWS = "db.response.returned_rows"
 SERVER_ADDRESS = "server.address"
 SERVER_PORT = "server.port"
 
+# --- AWS SDK calls (semantic-conventions docs/cloud-providers/aws-sdk.md) ---
+RPC_SYSTEM_NAME = "rpc.system.name"
+RPC_METHOD = "rpc.method"
+CLOUD_REGION = "cloud.region"
+
 _INSTRUMENTATION_SCOPE = "agent-latency-tracer"
 
 
@@ -255,6 +260,18 @@ def db_query_span(
     with tracer.start_as_current_span(
         f"{operation} {collection}", kind=SpanKind.CLIENT, attributes=attributes
     ) as span:
+        yield span
+
+
+@contextmanager
+def aws_sdk_span(tracer: trace.Tracer, *, service: str, operation: str, region: str | None = None) -> Iterator[Span]:
+    """Span for one AWS API call, named `{Service}.{Operation}` as the AWS SDK
+    conventions suggest (e.g. "BedrockAgentCore.CreateEvent";
+    semantic-conventions docs/cloud-providers/aws-sdk.md)."""
+    attributes: dict[str, Any] = {RPC_SYSTEM_NAME: "aws-api", RPC_METHOD: operation}
+    if region is not None:
+        attributes[CLOUD_REGION] = region
+    with tracer.start_as_current_span(f"{service}.{operation}", kind=SpanKind.CLIENT, attributes=attributes) as span:
         yield span
 
 

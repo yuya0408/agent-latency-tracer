@@ -12,12 +12,21 @@ data "aws_ecr_repository" "agent" {
   name = "agent-latency-tracer/agent"
 }
 
+# Short-term memory for the conversations (system/memory.py): the agent writes
+# each message and reads a conversation back when a new process meets it. No
+# strategies, so no long-term memory. Events kept for the shortest allowed time.
+resource "aws_bedrockagentcore_memory" "conversations" {
+  name                  = "${local.runtime_prefix}_conversations"
+  event_expiry_duration = 7
+}
+
 resource "aws_iam_role" "agent_runtime" {
   name               = "agent-latency-tracer-agent-runtime"
   assume_role_policy = local.runtime_assume_role_policy
 }
 
-# No RDS: the agent reaches the documents only through the MCP server.
+# No RDS: the agent reaches the documents only through the MCP server. Memory
+# goes through the bedrock-agentcore endpoint the MCP calls already use.
 resource "aws_iam_role_policy" "agent_runtime" {
   role = aws_iam_role.agent_runtime.id
   policy = jsonencode({
@@ -35,6 +44,11 @@ resource "aws_iam_role_policy" "agent_runtime" {
           aws_bedrockagentcore_agent_runtime.mcp_server.agent_runtime_arn,
           "${aws_bedrockagentcore_agent_runtime.mcp_server.agent_runtime_arn}/*",
         ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["bedrock-agentcore:CreateEvent", "bedrock-agentcore:ListEvents"]
+        Resource = [aws_bedrockagentcore_memory.conversations.arn]
       },
     ], local.runtime_common_statements)
   })
@@ -119,6 +133,7 @@ resource "aws_bedrockagentcore_agent_runtime" "agent" {
     LLM_MODEL      = "Qwen/Qwen3-8B" # vLLM's --served-model-name (gpu_boot.sh.tftpl)
     LLM_PROVIDER   = "vllm"
     MCP_SERVER_URL = local.mcp_server_url
+    MEMORY_ID      = aws_bedrockagentcore_memory.conversations.id
   }, local.pitfalls_env)
 
   request_header_configuration {

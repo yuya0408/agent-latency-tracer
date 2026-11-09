@@ -190,6 +190,55 @@ def test_history_is_trimmed_at_a_question(monkeypatch):
     assert [m["role"] for m in sent] == ["user", "assistant", "tool", "assistant", "user"]
 
 
+class FakeMemory:
+    """Stands in for AgentCoreMemory (system/memory.py), shared between agents
+    the way one AgentCore Memory is shared between processes."""
+
+    def __init__(self) -> None:
+        self.messages: dict[str, list[dict]] = {}
+        self.loads: list[str] = []
+
+    async def load(self, conversation_id: str) -> list[dict]:
+        self.loads.append(conversation_id)
+        return list(self.messages.get(conversation_id, []))
+
+    async def append(self, conversation_id: str, message: dict) -> None:
+        self.messages.setdefault(conversation_id, []).append(message)
+
+
+def test_every_message_is_written_to_the_memory_as_it_is_added():
+    memory = FakeMemory()
+    llm = ScriptedLlm([
+        _asks(_call("c1", "find_records", {"type": "item"}), _call("c2", "describe_data", {})),
+        _answers("done"),
+    ])
+    (result,) = _run_conversation(llm, [("q", "s1")], memory=memory)
+    assert memory.messages["s1"] == result.messages
+    assert [m["role"] for m in memory.messages["s1"]] == ["user", "assistant", "tool", "tool", "assistant"]
+
+
+def test_a_new_process_reads_the_conversation_back_from_the_memory():
+    memory = FakeMemory()
+    _run_conversation(ScriptedLlm([_asks(_call("c1", "describe_data", {})), _answers("a1")]), [("q1", "s1")], memory=memory)
+    # Another agent, as a new process for the same session after the old one is gone.
+    llm = ScriptedLlm([_answers("a2")])
+    _run_conversation(llm, [("q2", "s1")], memory=memory)
+    assert [m["role"] for m in llm.requests[0]] == ["user", "assistant", "tool", "assistant", "user"]
+    assert llm.requests[0][0]["content"] == "q1"
+
+
+def test_the_memory_is_read_only_when_the_process_lacks_the_conversation():
+    memory = FakeMemory()
+    _run_conversation(ScriptedLlm([_answers("a1"), _answers("a2"), _answers("b1")]), [("q1", "s1"), ("q2", "s1"), ("q3", "s2")], memory=memory)
+    assert memory.loads == ["s1", "s2"]
+
+
+def test_without_a_conversation_id_the_memory_is_not_used():
+    memory = FakeMemory()
+    _run_conversation(ScriptedLlm([_answers("a1")]), [("q1", None)], memory=memory)
+    assert memory.loads == [] and memory.messages == {}
+
+
 def test_spans_nest_under_one_invoke_agent_span():
     llm = ScriptedLlm([_asks(_call("c1", "find_records", {"type": "item"})), _answers("done")])
     _run(llm, ["q"])

@@ -15,6 +15,8 @@ Environment variables:
   LLM_MODEL          model name to request
   LLM_PROVIDER       goes on the chat span as gen_ai.provider.name
   MCP_SERVER_URL     MCP server (default http://127.0.0.1:8000/mcp)
+  MEMORY_ID          AgentCore Memory to keep conversations in (system/memory.py);
+                     unset, a conversation lives in the process only
   TRACE_TO, TRACE_DB where the spans go (tracing.exporter.exporters_from_env)
   AGENT_SERVER_HOST  address to listen on (default "127.0.0.1"; the container sets "0.0.0.0")
   PITFALLS           cases switched on in the agent (system/pitfalls.py)
@@ -35,6 +37,7 @@ from system import pitfalls
 from system.agent import Agent, AgentResult
 from system.llm.client import DEFAULT_BASE_URL, DEFAULT_MODEL, DEFAULT_PROVIDER_NAME, LlmClient
 from system.mcp_client import McpToolClient
+from system.memory import AgentCoreMemory
 from tracing.exporter import exporters_from_env
 from tracing.instrumentation import build_tracer_provider, get_tracer, set_global_tracer_provider
 
@@ -128,11 +131,13 @@ async def lifespan(app: Starlette) -> AsyncIterator[None]:
         provider_name=os.environ.get("LLM_PROVIDER", DEFAULT_PROVIDER_NAME),
     )
     server_url = os.environ.get("MCP_SERVER_URL", "http://127.0.0.1:8000/mcp")
+    memory_id = os.environ.get("MEMORY_ID")
+    memory = AgentCoreMemory(memory_id, tracer) if memory_id else None
     # One connection for the life of the process, as in the baseline (system/agent.py).
     async with llm, McpToolClient(server_url, tracer, agent_name="agent") as mcp:
         enabled = pitfalls.enabled()
         app.state.agent = Agent(
-            llm, mcp, tracer, sequential_tools="1" in enabled, time_in_prompt="10" in enabled
+            llm, mcp, tracer, sequential_tools="1" in enabled, time_in_prompt="10" in enabled, memory=memory
         )
         yield
     provider.shutdown()  # write out spans still queued in the batch processor
