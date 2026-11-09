@@ -15,8 +15,9 @@ from __future__ import annotations
 import re
 from typing import Any
 
-_KEEP_PREFIXES = ("gen_ai.", "mcp.", "vllm.", "llamacpp.", "llm.", "db.")
+_KEEP_PREFIXES = ("gen_ai.", "mcp.", "vllm.", "llamacpp.", "llm.", "db.", "rpc.")
 _KEEP_KEYS = frozenset({
+    "agent.memory.events",
     "botocore.retry_attempts",
     "caller.time_to_first_text_ms",
     "agent.time_to_first_text_ms",
