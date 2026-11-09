@@ -31,7 +31,7 @@
 | RDSの設定 | PostgreSQL 18(小さい版の番号は固定しない)、db.t4g.medium(メモリ4GB)、パスワードはRDSに作らせSecrets Managerに置く(`manage_master_user_password`)、踏み台と同じAZ、バックアップなし | 18はRDSの初期設定。小さい版まで固定すると、その版が選べなくなったときに作れなくなるので、代わりに測るときの実際の版を§8に記録する。mediumは、表とHNSWのインデックスがメモリに収まる大きさ(一般的な選び方。収まらないとディスクの遅さが事例5に混ざる)。microでは表だけで`shared_buffers`に収まらなかった。パスワードが状態ファイルに入らない。AZをまたぐ1ms前後の遅れを検索の時間に混ぜない |
 | pgvectorの測定の条件 | 1024次元×10万件(合成ベクトル、seedは0)。HNSWのパラメータはpgvectorの初期値(`m=16`・`ef_construction=64`・`ef_search=40`)。質問100個、top-5。時間は`EXPLAIN (ANALYZE, TIMING OFF)`のDBの中の実行時間で、1周温めてから測る | 条件は結果を見る前に、現実の値から決めた(差が出るように逆算しない)。1024はTitan Text Embeddings V2の初期値・bge-m3・multilingual-e5-largeの次元。10万件は中規模の社内文書(5,000件×20チャンク程度)。top-5はMCPサーバの初期値。手元のfaiss(128次元×50万件)は遅さを見せるための逆算で、手元の確認用に残す |
 | AgentCore Runtimeのネットワーク | VPCモード。サブネットは1つ目(`apne1-az1`)だけ。インターフェース型エンドポイント4つ(`ecr.api`・`ecr.dkr`・`logs`・`xray`)を同じサブネットに置き、受け入れはRuntimeのセキュリティグループからだけ。実行ロールは公式の例から、ECRをこのリポジトリに絞り、Bedrockのモデルの権限と`logs:PutResourcePolicy`を外した | ecr・logsは、外への出口が無いVPCでは公式に必須。xrayはトレースをCloudWatchに送る受付口。AWSの推奨はAZの違う2つ以上のサブネットだが、可用性は目的の外で、RDSと別のAZに置かれるとAZをまたぐ遅れが検索に混ざるので1つにした(エンドポイントの費用もAZの数だけ倍になる)。Runtime本体は、中に入れる本物のイメージ(MCPサーバ)と一緒に段階5で作る |
-| エージェントの基本形 | 1回の応答で頼まれたツール呼び出しは`asyncio.gather`で同時に実行し、MCPの接続とツールの一覧は使い回す。システムプロンプトは付けない。LLMを呼ぶのは1回の質問につき最大10回。会話はセッションの間メモリに持ち、直近40メッセージを残す(2026-11-06から) | 事例の「直した書き方」の基準。10はOpenAI Agents SDKの`DEFAULT_MAX_TURNS`(LangChainは15、smolagentsは20)。日付をシステムプロンプトに入れる話は#10の事例で扱う。会話の持ち方はAgentCoreの公式のセッションの説明(セッションの間は状態を保ち、それを超えて残すならAgentCore Memory)に合わせ、40はStrands Agentsの既定(`SlidingWindowConversationManager(window_size=40)`)。GPUの1回目までは質問ごとに会話を捨てていた(事例はどれも同じ回の基準と比べるので、1回目の結果はそのまま読める) |
+| エージェントの基本形 | 1回の応答で頼まれたツール呼び出しは`asyncio.gather`で同時に実行し、MCPの接続とツールの一覧は使い回す。システムプロンプトは付けない。LLMを呼ぶのは1回の質問につき最大10回。会話はセッションの間メモリに持ち、直近40メッセージを残す(2026-11-06から)。AWSでは、メッセージを足すたびにAgentCore Memory(短期の記憶)にも書き、プロセスにその会話が無いとき(新しいセッション、15分の後の新しいmicroVM)だけ読み戻す(2026-11-09から) | 事例の「直した書き方」の基準。10はOpenAI Agents SDKの`DEFAULT_MAX_TURNS`(LangChainは15、smolagentsは20)。日付をシステムプロンプトに入れる話は#10の事例で扱う。会話の持ち方はAgentCoreの公式のセッションの説明(セッションの間は状態を保ち、それを超えて残すならAgentCore Memory)に合わせ、40はStrands Agentsの既定(`SlidingWindowConversationManager(window_size=40)`)。GPUの1回目までは質問ごとに会話を捨てていた(事例はどれも同じ回の基準と比べるので、1回目の結果はそのまま読める)。Memoryの読み書きの形は、AWSの文書が紹介するStrands Agentsの連携(`AgentCoreMemorySessionManager`)に合わせた: エージェントを作るときに1回読み(`ListEvents`、strands-agents/sdk-python#1272)、メッセージごとに書く(`batch_size`の既定1)。保存は1メッセージ1イベントで、セッションはRuntimeのセッションID、利用者(`actorId`)はログインが無いので固定。長期の記憶(会話から事実を抜き出す)は抜き出しの精度の話になるので入れない。Memoryの書き込みは、11-09より前の回の基準には無い |
 | LLMへのリクエスト | ストリーミングで受け、temperatureは0にする。`max_tokens`は付けない | ストリーミング: TTFTはllama.cpp以外のサーバでも測れ、チャットの体感の速さを決め、llama.cppの読み込み時間との差で通信などの分が分かる。temperature: llama.cppの初期値0.8では、同じ質問でツール呼び出しの数が2つになったり4つになったりした。`max_tokens`: 主なフレームワークは初期値で付けない。止まらない生成(§7の9)は#9の材料なので、基準の側で隠さない |
 | LLMの動かし方とモデルの大きさ | 事例の再現はGPUの8Bで行う。モデルの大きさは比べない | 手元のCPUで2Bを動かすと、1問18〜63秒のほとんどをLLMが占め、ツールの実行は1回1秒未満だった(§8)。事例の差(数十ミリ秒〜数秒)がLLMの時間に埋もれ、どの遅れが体感に効くかの比率が実際のサービス(GPUで推論)と大きく違う。答えの正しさは目的の外のまま。2026-10-11に「2Bのまま」と決めたが、この点を見落としていたため改めた |
 
@@ -72,7 +72,8 @@
 | [system/serving/otel-collector.yaml](../system/serving/otel-collector.yaml) | Collectorの設定(§1) | ✅ |
 | [system/llm/](../system/llm/) | OpenAI互換クライアント。ストリーミングで受け、chat spanにTTFTとエンジンの内訳(llama.cppの`timings`、vLLMの`metrics`)を記録する。断片で届くツール呼び出しを組み立てる。HTTPヘッダに`traceparent`を載せる | ✅ |
 | [system/agent.py](../system/agent.py) | エージェントループ(§1の「エージェントの基本形」) | ✅ |
-| [system/agent_server.py](../system/agent_server.py)・[Dockerfile.agent](../Dockerfile.agent) | エージェントのHTTPの入口(AgentCore Runtimeの決まりに合わせ、ポート8080の`GET /ping`と`POST /invocations`)。受け取った`traceparent`のトレースに入り、セッションIDを`gen_ai.conversation.id`に記録する。接続先は環境変数で渡す。Runtimeは`infra/agentcore_agent.tf` | ✅ |
+| [system/agent_server.py](../system/agent_server.py)・[Dockerfile.agent](../Dockerfile.agent) | エージェントのHTTPの入口(AgentCore Runtimeの決まりに合わせ、ポート8080の`GET /ping`と`POST /invocations`)。受け取った`traceparent`のトレースに入り、セッションIDを`gen_ai.conversation.id`に記録する。接続先は環境変数で渡す(`MEMORY_ID`があればAgentCore Memoryを使う)。Runtimeは`infra/agentcore_agent.tf` | ✅ |
+| [system/memory.py](../system/memory.py) | AgentCore Memoryへの会話の読み書き(§1の「エージェントの基本形」)。呼び出しごとに`BedrockAgentCore.ListEvents`・`BedrockAgentCore.CreateEvent`のspan(AWS SDKの規約の名前)を作り、送り直しの回数を付ける | ✅ |
 | [scripts/invoke_agent.py](../scripts/invoke_agent.py) | 利用者役。Runtime上のエージェントに仮の質問を`InvokeAgentRuntime`で投げ、自分のspanの`traceparent`を付ける。質問ごとに新しいセッション | ✅ |
 | [infra/](../infra/) | Terraform(VPC・RDS・踏み台・AgentCore Runtime・基盤側のspanの配送)。`infra/account/`はTransaction Search。`infra/artifacts/`はイメージ(ECR。vLLM・Collector・MCPサーバ・エージェント)と重み(S3)の置き場で、段階ごとに消さない | ✅ |
 | `docs/runbook.md`・`traces/` | 手順書と根拠のトレース | ⬜ |
@@ -382,9 +383,13 @@
       同じ時間に動く他の質問の接続と混ざるので使わない。同じ踏み台で`SHOW max_connections`を見る(db.t4g.mediumの既定の式で約400本、未確認)。
       接続は「4本 × 生きているセッションの数」で数える。#12と同じ仮定(300人・1日3問・繁忙時は3倍)で1問ごとに新しいセッションなら、繁忙時に生きているセッションは約90個
       (1時間に約340問 × 約15分20秒)で約360本、生存確認まで残るなら約125個分で約500本。同時6問(処理中の質問の数)で数えると約24本で、数え方を間違えやすい
-    - **15分の後の、会話の履歴**: 会話はエージェントのプロセスのメモリにだけある(`system/agent.py`)。使われない時間の設定は`infra/`に無く既定の15分なので、
-      それを過ぎた続きの質問は、エラーにならないまま前の話を失う見込み。S0の接続を読み終えた後(新しいセッションが自分の4本を作るため)、
-      前の答えを前提にした続きの質問を1問送る。最長8時間(`maxLifetime`)で切れる件も同じ形だが、長いので記録だけ
+    - **15分の後の、会話の履歴**: 使われない時間の設定は`infra/`に無く既定の15分なので、それを過ぎるとmicroVMごとプロセスの会話が消える。
+      Memoryを入れる前は、続きの質問がエラーにならないまま前の話を失う形だった(2026-11-09にMemoryを入れた)。S0の接続を読み終えた後
+      (新しいセッションが自分の4本を作るため)、前の答えを前提にした続きの質問を1問送り、Memoryから読み戻せたか(`ListEvents`の件数、
+      LLMの入力に前の質問が入っているか)と、読み戻しの時間を見る。最長8時間(`maxLifetime`)で切れる件も同じ形だが、長いので記録だけ
+    - **Memoryの読み書きの時間**: 書き込みはメッセージごとなので、ツールを呼ぶ質問では最後の答えの前に数回の`CreateEvent`が乗る(見え始めの通り道)。
+      新しいセッションの最初の質問には、空の`ListEvents`が1回乗る。基準の6問の`CreateEvent`・`ListEvents`のspanの長さを、見え始めの秒数と並べて記録し、
+      手順書の「直すかどうかの判断」で扱う
     - **MCPサーバのセッションだけが先に切れたとき**: MCPのセッションIDはエージェントのプロセスごとに1つ(`system/mcp_client.py`)。エージェント側だけ使われ続け、
       MCP側への呼び出しが15分無いと、MCP側のセッションだけが終わる。同じIDで呼ぶと新しいmicroVMが用意され(公式の文書)、検索の中でもプールを開くので、
       エラーではなく「起動＋接続づくり」が検索に乗る見込み。セッションS1で、ツールを使わない短い質問を他の質問の合間に約5分おきに送り、15分を過ぎたら
