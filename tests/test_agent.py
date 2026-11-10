@@ -227,6 +227,21 @@ def test_a_new_process_reads_the_conversation_back_from_the_memory():
     assert llm.requests[0][0]["content"] == "q1"
 
 
+@pytest.mark.parametrize("left", [
+    # Stopped while the tool ran: the request went to the memory, its result never did.
+    [{"role": "assistant", "content": "", "tool_calls": [_call("c1", "describe_data", {})]}],
+    # Two tools asked for, one result written (pitfall #1 writes each as it ends).
+    [{"role": "assistant", "content": "", "tool_calls": [_call("c1", "describe_data", {}), _call("c2", "describe_data", {})]},
+     {"role": "tool", "tool_call_id": "c1", "content": "{}"}],
+])
+def test_a_request_for_tools_without_its_results_is_not_read_back(left):
+    memory = FakeMemory()
+    memory.messages["s1"] = [{"role": "user", "content": "q1"}, *left]
+    llm = ScriptedLlm([_answers("a2")])
+    _run_conversation(llm, [("q2", "s1")], memory=memory)
+    assert llm.requests[0] == [{"role": "user", "content": "q1"}, {"role": "user", "content": "q2"}]
+
+
 def test_the_memory_is_read_only_when_the_process_lacks_the_conversation():
     memory = FakeMemory()
     _run_conversation(ScriptedLlm([_answers("a1"), _answers("a2"), _answers("b1")]), [("q1", "s1"), ("q2", "s1"), ("q3", "s2")], memory=memory)

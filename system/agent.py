@@ -152,7 +152,7 @@ class Agent:
             return self._histories[conversation_id]
         if self._memory is None:
             return []
-        return _last_turns(await self._memory.load(conversation_id), HISTORY_WINDOW)
+        return _last_turns(_without_unanswered_tool_calls(await self._memory.load(conversation_id)), HISTORY_WINDOW)
 
     async def _add(self, messages: list[dict[str, Any]], conversation_id: str | None, message: dict[str, Any]) -> None:
         """Add one message, and write it to the memory as it is added, as
@@ -179,6 +179,24 @@ class Agent:
             result = await self._mcp.call_tool(call["function"]["name"], arguments, tool_call_id=call["id"])
             content = "\n".join(c.text for c in result.content if isinstance(c, types.TextContent))
         return {"role": "tool", "tool_call_id": call["id"], "content": content}
+
+
+def _without_unanswered_tool_calls(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The conversation without a last request for tools whose results did not
+    all come back: the run was stopped or failed while its tools ran, after
+    the request had gone to the memory. OpenAI-style APIs reject a request
+    for tools not followed by a result for each. Left in, the next question
+    would follow a call that never ended."""
+    for i in range(len(messages) - 1, -1, -1):
+        message = messages[i]
+        if message["role"] == "user":
+            return messages
+        if message["role"] == "assistant":
+            answered = {m.get("tool_call_id") for m in messages[i + 1:]}
+            if all(c["id"] in answered for c in message.get("tool_calls") or []):
+                return messages
+            return messages[:i]
+    return messages
 
 
 def _last_turns(messages: list[dict[str, Any]], window: int) -> list[dict[str, Any]]:
