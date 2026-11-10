@@ -71,3 +71,9 @@ def test_mask_leaves_numbers_alone():
 def test_mask_keeps_the_retry_count_on_the_embeddings_span():
     doc = _otel_document(attributes={"botocore.retry_attempts": 0})
     assert mask_span(from_otel_document(doc))["attributes"] == {"botocore.retry_attempts": 0}
+
+
+def test_mask_keeps_what_the_caller_says_about_its_call():
+    attributes = {"caller.time_to_first_text_ms": 6400.5, "caller.cut_after_s": 4.0, "caller.warmup": False}
+    doc = _otel_document(attributes=attributes)
+    assert mask_span(from_otel_document(doc))["attributes"] == attributes

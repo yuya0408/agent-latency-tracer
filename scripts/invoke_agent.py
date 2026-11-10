@@ -28,7 +28,8 @@ For how sessions end and break (docs/DESIGN.md §6, 7):
                     continues the conversation (e.g. after 15 minutes unused)
   --question TEXT   ask this text instead of a numbered question (repeatable)
   --cut-after S     close the stream S seconds after sending, as a user who
-                    leaves; the report says where it was cut
+                    leaves, and stop the session (StopRuntimeSession); the
+                    report says where it was cut
 """
 from __future__ import annotations
 import argparse, json, os, sys, threading, time, uuid
@@ -76,6 +77,10 @@ def main(
     # One attempt, and long enough for the agent's longest run.
     config = Config(read_timeout=900, retries={"total_max_attempts": 1})
     client = botocore.session.get_session().create_client("bedrock-agentcore", region_name=region, config=config)
+    # Stopping a session keeps botocore's retries: the runtime answers 409
+    # (RetryableConflictException) while it is still setting a session up or
+    # tearing it down, and asks callers to retry.
+    stopper = botocore.session.get_session().create_client("bedrock-agentcore", region_name=region)
 
     def new_session() -> str:
         return str(uuid.uuid4())  # at least 33 characters
@@ -102,13 +107,23 @@ def main(
                 # arrives (tools running between pings). Closing the body from
                 # another thread doesn't wake a read that is waiting; urllib3's
                 # shutdown() (2.3+) does, by shutting the socket down.
+                # The runtime doesn't pass the closed stream on to the agent,
+                # which went on to the end of its answer (2026-11-09), so the
+                # session is stopped too, as a chat's web server would do when
+                # its user leaves.
                 cut = None
                 was_cut = threading.Event()
                 if cut_after_s is not None:
+                    asking = trace.set_span_in_context(span)
+
                     def close() -> None:
                         was_cut.set()
                         response["response"]._raw_stream.shutdown()
                         response["response"].close()
+                        with tracer.start_as_current_span(
+                            "StopRuntimeSession", context=asking, kind=trace.SpanKind.CLIENT
+                        ):
+                            stopper.stop_runtime_session(agentRuntimeArn=arn, runtimeSessionId=session_id)
 
                     cut = threading.Timer(max(0.0, cut_after_s - (time.perf_counter() - start)), close)
                     cut.start()
@@ -131,6 +146,7 @@ def main(
                 finally:
                     if cut is not None:
                         cut.cancel()
+                        cut.join()  # the session is stopped before the next question
                 if was_cut.is_set() and not body:
                     elapsed = time.perf_counter() - start
                     span.set_attribute(CUT_AFTER_S, cut_after_s)

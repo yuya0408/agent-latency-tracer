@@ -20,6 +20,8 @@ _KEEP_KEYS = frozenset({
     "agent.memory.events",
     "botocore.retry_attempts",
     "caller.time_to_first_text_ms",
+    "caller.cut_after_s",
+    "caller.warmup",
     "agent.time_to_first_text_ms",
     "error.type",
     "jsonrpc.request.id",
