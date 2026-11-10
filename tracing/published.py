@@ -33,7 +33,7 @@ _KEEP_KEYS = frozenset({
     "http.status_code",
     "http.response.status_code",
 })
-_KEEP_RESOURCE_KEYS = frozenset({"service.name", "scenario.pitfalls"})
+_KEEP_RESOURCE_KEYS = frozenset({"service.name", "scenario.pitfalls", "process.creation.time"})
 
 _ARN = re.compile(r"arn:aws[\w-]*:[^\s\"',]+")
 _ACCOUNT_ID = re.compile(r"(?<!\d)\d{12}(?!\d)")

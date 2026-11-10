@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -235,3 +236,16 @@ def test_trace_ids_start_with_the_start_time(db_path):
     provider.shutdown()
 
     assert before <= int(trace_id[:8], 16) <= after
+
+
+def test_spans_carry_when_the_process_started(db_path):
+    """Every span's resource has process.creation.time, so a span's start minus
+    it says how long the process had been up (a fresh microVM or not)."""
+    provider, tracer = _make_tracer(db_path)
+    trace_id = _run_synthetic_pipeline(tracer, capture_content=False)
+    provider.shutdown()
+
+    for span in read_trace(db_path, trace_id):
+        started = datetime.fromisoformat(span["resource"]["process.creation.time"])
+        assert started.tzinfo is not None
+        assert started <= datetime.now(timezone.utc)

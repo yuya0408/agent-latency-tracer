@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from typing import Any, Iterator, Mapping, Sequence
 
 from opentelemetry import trace
@@ -79,7 +80,17 @@ RPC_SYSTEM_NAME = "rpc.system.name"
 RPC_METHOD = "rpc.method"
 CLOUD_REGION = "cloud.region"
 
+# --- process.* (semantic-conventions docs/resource/process.md) -------------
+PROCESS_CREATION_TIME = "process.creation.time"
+
 _INSTRUMENTATION_SCOPE = "agent-latency-tracer"
+
+# When this module was first imported, standing in for when the process
+# started: later than the OS's start by Python's own start-up and imports (a
+# second or two), which doesn't matter for telling a just-started microVM from
+# one that has been running for minutes. A span's start minus this is how long
+# the process had been up.
+_PROCESS_STARTED = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
 
 # How often the batch worker writes queued spans. Shorter than the SDK default
@@ -96,7 +107,8 @@ def build_tracer_provider(
     """Wire one or more exporters to a new provider, each behind its own processor.
 
     resource_attributes go on every span alongside service.name (e.g. which
-    pitfalls the process runs with, system/pitfalls.py).
+    pitfalls the process runs with, system/pitfalls.py), as does
+    process.creation.time (see _PROCESS_STARTED).
 
     One processor per exporter, so a slow destination (CloudWatch: signing and
     an HTTPS round trip per batch) doesn't hold up the others; with batch=True
@@ -121,7 +133,9 @@ def build_tracer_provider(
     # in the index; with the SDK's random IDs it says the trace has expired
     # (docs/DESIGN.md §5). Still valid W3C IDs, so SQLite and the viewer don't care.
     provider = TracerProvider(
-        resource=Resource.create({**(resource_attributes or {}), "service.name": service_name}),
+        resource=Resource.create(
+            {**(resource_attributes or {}), PROCESS_CREATION_TIME: _PROCESS_STARTED, "service.name": service_name}
+        ),
         id_generator=AwsXRayIdGenerator(),
     )
     for exporter in exporters:
