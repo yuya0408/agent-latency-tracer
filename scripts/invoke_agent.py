@@ -75,13 +75,14 @@ def main(
     # botocore's defaults (60 s read timeout, then a retry) sent a question
     # longer than 60 s a second time, and the runtime ran both (2026-11-05).
     # One attempt, and long enough for the agent's longest run.
-    config = Config(read_timeout=900, retries={"total_max_attempts": 1})
+    config = Config(read_timeout=900, retries={"mode": "standard", "total_max_attempts": 1})
     client = botocore.session.get_session().create_client("bedrock-agentcore", region_name=region, config=config)
     # Stopping a session is retried: the runtime answers 409
     # (RetryableConflictException) while it is still setting a session up or
-    # tearing it down, and asks callers to retry. Only botocore's "standard"
-    # mode retries on that; the default "legacy" mode retries from a fixed list
-    # without it (botocore 1.43).
+    # tearing it down, and asks callers to retry. Every client here uses
+    # botocore's "standard" retry mode, which retries the errors a service's
+    # model marks retryable, this one among them; the default "legacy" mode
+    # retries from a fixed list without it (botocore 1.43).
     stopper = botocore.session.get_session().create_client(
         "bedrock-agentcore", region_name=region, config=Config(retries={"mode": "standard"})
     )

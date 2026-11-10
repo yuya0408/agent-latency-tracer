@@ -43,8 +43,9 @@ def main() -> None:
         return
 
     import botocore.session  # needs the "aws" extra
+    from botocore.config import Config
 
-    client = botocore.session.get_session().create_client("bedrock-runtime", region_name=REGION)
+    client = botocore.session.get_session().create_client("bedrock-runtime", region_name=REGION, config=Config(retries={"mode": "standard"}))
     chunks = [json.loads(line) for line in CHUNKS.read_text(encoding="utf-8").splitlines()]
     vectors, tokens = [], []
     start = time.perf_counter()

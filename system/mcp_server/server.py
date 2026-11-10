@@ -134,8 +134,9 @@ class _TitanEmbedder:
 
     def __init__(self) -> None:
         import botocore.session  # needs the "aws" extra
+        from botocore.config import Config
 
-        self._client = botocore.session.get_session().create_client("bedrock-runtime")
+        self._client = botocore.session.get_session().create_client("bedrock-runtime", config=Config(retries={"mode": "standard"}))
 
     def _invoke(self, text: str) -> dict[str, Any]:
         body = json.dumps({"inputText": text, "dimensions": PGVECTOR_DIM, "normalize": True})
@@ -167,8 +168,9 @@ class _RdsIamToken:
 
     def __init__(self) -> None:
         import botocore.session  # needs the "aws" extra
+        from botocore.config import Config
 
-        self._rds = botocore.session.get_session().create_client("rds")
+        self._rds = botocore.session.get_session().create_client("rds", config=Config(retries={"mode": "standard"}))
 
     def __call__(self) -> dict[str, str]:
         host, port, user = os.environ["PGHOST"], int(os.environ.get("PGPORT", "5432")), os.environ["PGUSER"]
