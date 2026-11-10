@@ -27,7 +27,13 @@ def _otel_document(**overrides):
             "latency_ms": 5_200,
             "gen_ai.operation.name": "chat",
         },
-        "resource": {"attributes": {"service.name": "agent", "cloud.resource_id": _ARN}},
+        "resource": {
+            "attributes": {
+                "service.name": "agent",
+                "cloud.resource_id": _ARN,
+                "process.creation.time": "2026-11-12T10:03:41.000+00:00",
+            }
+        },
     }
     return {**doc, **overrides}
 
@@ -50,7 +56,7 @@ def test_root_span_has_no_parent():
 def test_mask_keeps_only_listed_keys():
     span = mask_span(from_otel_document(_otel_document()))
     assert span["attributes"] == {"session.id": "s-1", "latency_ms": 5_200, "gen_ai.operation.name": "chat"}
-    assert span["resource"] == {"service.name": "agent"}
+    assert span["resource"] == {"service.name": "agent", "process.creation.time": "2026-11-12T10:03:41.000+00:00"}
 
 
 def test_mask_replaces_account_ids_and_arns_left_in_kept_values():
