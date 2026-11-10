@@ -46,8 +46,9 @@ class AgentCoreMemory:
 
     def __init__(self, memory_id: str, tracer: trace.Tracer) -> None:
         import botocore.session  # needs the "aws" extra
+        from botocore.config import Config
 
-        self._client = botocore.session.get_session().create_client("bedrock-agentcore")
+        self._client = botocore.session.get_session().create_client("bedrock-agentcore", config=Config(retries={"mode": "standard"}))
         self._memory_id = memory_id
         self._tracer = tracer
         self._next_seq: dict[str, int] = {}

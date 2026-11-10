@@ -25,8 +25,9 @@ _WINDOW_S = 3600
 
 def _from_cloudwatch(trace_id: str) -> list[dict]:
     import botocore.session  # needs the "aws" extra
+    from botocore.config import Config
 
-    xray = botocore.session.get_session().create_client("xray")
+    xray = botocore.session.get_session().create_client("xray", config=Config(retries={"mode": "standard"}))
     # An X-Ray trace ID's first 8 hex digits are its start time in epoch seconds.
     start = int(trace_id[:8], 16)
     token = xray.start_trace_retrieval(
