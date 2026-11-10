@@ -77,6 +77,10 @@ def main(
     # One attempt, and long enough for the agent's longest run.
     config = Config(read_timeout=900, retries={"total_max_attempts": 1})
     client = botocore.session.get_session().create_client("bedrock-agentcore", region_name=region, config=config)
+    # Stopping a session keeps botocore's retries: the runtime answers 409
+    # (RetryableConflictException) while it is still setting a session up or
+    # tearing it down, and asks callers to retry.
+    stopper = botocore.session.get_session().create_client("bedrock-agentcore", region_name=region)
 
     def new_session() -> str:
         return str(uuid.uuid4())  # at least 33 characters
@@ -119,7 +123,7 @@ def main(
                         with tracer.start_as_current_span(
                             "StopRuntimeSession", context=asking, kind=trace.SpanKind.CLIENT
                         ):
-                            client.stop_runtime_session(agentRuntimeArn=arn, runtimeSessionId=session_id)
+                            stopper.stop_runtime_session(agentRuntimeArn=arn, runtimeSessionId=session_id)
 
                     cut = threading.Timer(max(0.0, cut_after_s - (time.perf_counter() - start)), close)
                     cut.start()
