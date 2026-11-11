@@ -193,8 +193,9 @@ AWSでは`infra/`のTerraformで作り、`-var pitfalls=1,2`のように落と�
 
 ほかの決定は、却下した案とともに[設計書](docs/DESIGN.md)の§1にある。
 
-## 出典
+## ライセンス・出典
 
+- コードは[MITライセンス](LICENSE)。`data/corpus/`の文書には、下の別の条件がかかる
 - 文書検索の文書は、厚生労働省のモデル就業規則・育児介護休業等に関する規則の規定例と、e-Gov法令検索の法令を条ごとに切り出して加工したもの。
   版・出典・加工した内容・利用条件は[data/corpus/README.md](data/corpus/README.md)にある
 - 落とし穴の出典は[調査メモ](docs/latency-pitfalls-survey.md)にある
