@@ -1,0 +1,369 @@
+{
+ "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+ "spans": [
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "3239e400faa56df0",
+   "parent_span_id": "4d8bf831b45e3c4a",
+   "name": "AgentCore.Runtime.Invoke",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1794363632222000000,
+   "end_time_unix_nano": 1794363632647000000,
+   "status_code": "OK",
+   "status_description": null,
+   "attributes": {
+    "latency_ms": 405,
+    "http.status_code": 200,
+    "aws.operation.name": "InvokeAgentRuntime",
+    "http.method": "POST",
+    "http.response.status_code": 200,
+    "session.id": "805808ff-bb39-4231-bbad-3039917e0e60"
+   },
+   "resource": {
+    "service.name": "agent_latency_tracer_mcp_server.DEFAULT"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "c88e7fd4495ca9e3",
+   "parent_span_id": "3239e400faa56df0",
+   "name": "POST /mcp",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1794363632642523454,
+   "end_time_unix_nano": 1794363632644644386,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "http.target": "/mcp",
+    "http.status_code": 200,
+    "http.method": "POST",
+    "http.response.status_code": 200
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "process.creation.time": "2026-11-11T02:19:47.640+00:00",
+    "scenario.pitfalls": "none"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "7598f0aa24183245",
+   "parent_span_id": "4d8bf831b45e3c4a",
+   "name": "server/discover",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1794363632643625983,
+   "end_time_unix_nano": 1794363632643932219,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "server/discover",
+    "jsonrpc.request.id": "1"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "process.creation.time": "2026-11-11T02:19:47.640+00:00",
+    "scenario.pitfalls": "none"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "08cf6ebdee38dec5",
+   "parent_span_id": "7589d98f7264f1ad",
+   "name": "AgentCore.Runtime.Invoke",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1794363632757000000,
+   "end_time_unix_nano": 1794363632807000000,
+   "status_code": "OK",
+   "status_description": null,
+   "attributes": {
+    "latency_ms": 26,
+    "http.status_code": 200,
+    "aws.operation.name": "InvokeAgentRuntime",
+    "http.method": "POST",
+    "http.response.status_code": 200,
+    "session.id": "805808ff-bb39-4231-bbad-3039917e0e60"
+   },
+   "resource": {
+    "service.name": "agent_latency_tracer_mcp_server.DEFAULT"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "92490900baf6355c",
+   "parent_span_id": "08cf6ebdee38dec5",
+   "name": "POST /mcp",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1794363632803052625,
+   "end_time_unix_nano": 1794363632805155814,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "http.target": "/mcp",
+    "http.status_code": 200,
+    "http.method": "POST",
+    "http.response.status_code": 200
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "process.creation.time": "2026-11-11T02:19:47.640+00:00",
+    "scenario.pitfalls": "none"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "51963a2c7ae7cbc9",
+   "parent_span_id": "7589d98f7264f1ad",
+   "name": "tools/list",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1794363632803761814,
+   "end_time_unix_nano": 1794363632804215420,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/list",
+    "jsonrpc.request.id": "2"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "process.creation.time": "2026-11-11T02:19:47.640+00:00",
+    "scenario.pitfalls": "none"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "0632aa93d42b6f9b",
+   "parent_span_id": null,
+   "name": "invoke_agent mcp_direct",
+   "kind": "INTERNAL",
+   "start_time_unix_nano": 1794363632891530997,
+   "end_time_unix_nano": 1794363634250247870,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.operation.name": "invoke_agent",
+    "gen_ai.agent.name": "mcp_direct"
+   },
+   "resource": {
+    "service.name": "caller",
+    "process.creation.time": "2026-11-11T02:20:32.705+00:00"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "a5f7e670eb2ea410",
+   "parent_span_id": "50725209759d68a0",
+   "name": "AgentCore.Runtime.Invoke",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1794363632896000000,
+   "end_time_unix_nano": 1794363633112000000,
+   "status_code": "OK",
+   "status_description": null,
+   "attributes": {
+    "latency_ms": 195,
+    "http.status_code": 200,
+    "aws.operation.name": "InvokeAgentRuntime",
+    "http.method": "POST",
+    "http.response.status_code": 200,
+    "session.id": "805808ff-bb39-4231-bbad-3039917e0e60"
+   },
+   "resource": {
+    "service.name": "agent_latency_tracer_mcp_server.DEFAULT"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "bc15bbfe285bf012",
+   "parent_span_id": "a5f7e670eb2ea410",
+   "name": "POST /mcp",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1794363632936339653,
+   "end_time_unix_nano": 1794363633108888078,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "http.target": "/mcp",
+    "http.status_code": 200,
+    "http.method": "POST",
+    "http.response.status_code": 200
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "process.creation.time": "2026-11-11T02:19:47.640+00:00",
+    "scenario.pitfalls": "none"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "e925db5525a1d73f",
+   "parent_span_id": "bc15bbfe285bf012",
+   "name": "tools/list",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1794363632936887774,
+   "end_time_unix_nano": 1794363632937165043,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/list",
+    "jsonrpc.request.id": "3"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "process.creation.time": "2026-11-11T02:19:47.640+00:00",
+    "scenario.pitfalls": "none"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "368e02742fe239de",
+   "parent_span_id": "50725209759d68a0",
+   "name": "tools/call retrieve_documents",
+   "kind": "SERVER",
+   "start_time_unix_nano": 1794363632937641057,
+   "end_time_unix_nano": 1794363633108203374,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": "retrieve_documents",
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/call",
+    "jsonrpc.request.id": "3"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "process.creation.time": "2026-11-11T02:19:47.640+00:00",
+    "scenario.pitfalls": "none"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "d5939cb8d98a8d30",
+   "parent_span_id": "368e02742fe239de",
+   "name": "embeddings amazon.titan-embed-text-v2:0",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1794363632937880501,
+   "end_time_unix_nano": 1794363633098739880,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.provider.name": "aws.bedrock",
+    "gen_ai.embeddings.dimension.count": 1024,
+    "gen_ai.operation.name": "embeddings",
+    "gen_ai.usage.input_tokens": 12,
+    "gen_ai.request.model": "amazon.titan-embed-text-v2:0",
+    "botocore.retry_attempts": 0
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "process.creation.time": "2026-11-11T02:19:47.640+00:00",
+    "scenario.pitfalls": "none"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "4d8bf831b45e3c4a",
+   "parent_span_id": "0632aa93d42b6f9b",
+   "name": "MCP send server/discover",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1794363632954967639,
+   "end_time_unix_nano": 1794363633747590593,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.method.name": "server/discover",
+    "jsonrpc.request.id": "1"
+   },
+   "resource": {
+    "service.name": "caller",
+    "process.creation.time": "2026-11-11T02:20:32.705+00:00"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "adbefc6252fbe5c7",
+   "parent_span_id": "368e02742fe239de",
+   "name": "SELECT documents",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1794363633100738658,
+   "end_time_unix_nano": 1794363633106488822,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "db.query.text": "SELECT id, source, text, embedding <-> %(q)s AS distance FROM documents ORDER BY embedding <-> %(q)s LIMIT %(k)s",
+    "db.collection.name": "documents",
+    "db.response.returned_rows": 10,
+    "db.system.name": "postgresql",
+    "db.operation.name": "SELECT"
+   },
+   "resource": {
+    "service.name": "mcp-server",
+    "process.creation.time": "2026-11-11T02:19:47.640+00:00",
+    "scenario.pitfalls": "none"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "7589d98f7264f1ad",
+   "parent_span_id": "0632aa93d42b6f9b",
+   "name": "MCP send tools/list",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1794363633748016608,
+   "end_time_unix_nano": 1794363633904089689,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.method.name": "tools/list",
+    "jsonrpc.request.id": "2"
+   },
+   "resource": {
+    "service.name": "caller",
+    "process.creation.time": "2026-11-11T02:20:32.705+00:00"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "aa5f537cd1265ef2",
+   "parent_span_id": "0632aa93d42b6f9b",
+   "name": "execute_tool retrieve_documents",
+   "kind": "INTERNAL",
+   "start_time_unix_nano": 1794363633904639162,
+   "end_time_unix_nano": 1794363634249590350,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": "retrieve_documents",
+    "gen_ai.tool.type": "function",
+    "gen_ai.agent.name": "mcp_direct",
+    "mcp.protocol.version": "2026-07-28",
+    "mcp.method.name": "tools/call"
+   },
+   "resource": {
+    "service.name": "caller",
+    "process.creation.time": "2026-11-11T02:20:32.705+00:00"
+   }
+  },
+  {
+   "trace_id": "6af3d0f0102eab90317d532a7f597a6f",
+   "span_id": "50725209759d68a0",
+   "parent_span_id": "aa5f537cd1265ef2",
+   "name": "MCP send tools/call retrieve_documents",
+   "kind": "CLIENT",
+   "start_time_unix_nano": 1794363633905649099,
+   "end_time_unix_nano": 1794363634248680905,
+   "status_code": "UNSET",
+   "status_description": null,
+   "attributes": {
+    "mcp.method.name": "tools/call",
+    "jsonrpc.request.id": "3"
+   },
+   "resource": {
+    "service.name": "caller",
+    "process.creation.time": "2026-11-11T02:20:32.705+00:00"
+   }
+  }
+ ]
+}
