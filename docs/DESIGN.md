@@ -109,7 +109,7 @@
 | 組み合わせ | 予想される見え方 | 見分けるのに要りそうなもの |
 |---|---|---|
 | #1 逐次await / #2 ブロッキング呼び出し | どちらもtool spanが階段状 | 並列化を意図したかの記録、イベントループの遅延 |
-| R リトライ | 1つのtool spanの中に隠れる | 試行ごとのspan event。2026-11-10: エージェント→MCPはMCPのSDKが要求ごとにspanを出し、タイムアウトはその中のエラーになるので、SDKのspanを受け取っていれば見える。再現は外した(README)。既定で再送するAWSのSDKの区間は、相手側(AgentCore)のspanで見つけた(手順書「同じ質問が2重に処理される」) |
+| R リトライ | 1つのtool spanの中に隠れる | 試行ごとのspan event。2026-11-10: エージェント→MCPはMCPのSDKが要求ごとにspanを出し、タイムアウトはその中のエラーになるので、SDKのspanを受け取っていれば見える。再現は外した(手順書の事例の一覧)。既定で再送するAWSのSDKの区間は、相手側(AgentCore)のspanで見つけた(手順書「同じ質問が2重に処理される」) |
 | M2 クライアントの作り直し | tool呼び出しが一律に遅い | `server/discover`/`tools/list`のspan、AgentCoreの`Mcp-Session-Id`と新しいmicroVMかどうか |
 | #8 長い入力 / #9 長い出力 | どちらもchat spanが長い | TTFT |
 | ネットワーク / AWSの基盤 / サーバのコード | エージェント側のspanだけでは区別できない | AgentCoreの`InvokeAgentRuntime` span、サーバ側span、新しいセッションかどうか |
