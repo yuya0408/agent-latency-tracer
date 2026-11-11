@@ -47,6 +47,14 @@ SESSION_HEADER = "x-amzn-bedrock-agentcore-runtime-session-id"
 # How long a streamed answer may go without sending anything. Common proxy
 # idle timeouts are a minute or more (nginx's proxy_read_timeout: 60 s).
 PING_INTERVAL_S = 15.0
+# How long to let running requests finish once told to stop (SIGTERM). The
+# runtime says so when a session is stopped (StopRuntimeSession, sent when the
+# user leaves) or has gone unused for 15 minutes: either the caller is gone or
+# nothing is running, so none is worth waiting for. Without a limit uvicorn
+# waits for every request to end, and a stopped session's agent went on to
+# the end of its answer (2026-11-11). Past the limit uvicorn cancels them,
+# which stops the agent as a closed stream does (_events).
+SHUTDOWN_GRACE_S = 0
 
 
 async def ping(request: Request) -> JSONResponse:
@@ -150,4 +158,4 @@ app = Starlette(
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host=HOST, port=PORT)
+    uvicorn.run(app, host=HOST, port=PORT, timeout_graceful_shutdown=SHUTDOWN_GRACE_S)
