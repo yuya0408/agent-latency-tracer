@@ -172,7 +172,7 @@ AWSでは`infra/`のTerraformで作り、`-var pitfalls=1,2`のように落と�
 | `tracing/` | 計装(spanの定義)、手元用の保存とwaterfall、公開用に伏せる処理 |
 | `scripts/` | 手元とAWSでの実行、トレースの書き出し、READMEの図(`plot_*.py`) |
 | `infra/` | Terraform(VPC・RDS・AgentCore・GPU) |
-| `traces/` | 手順書の根拠のトレース(伏せたJSONとwaterfallのHTML、事例ごとのフォルダ) |
+| `traces/` | 根拠のトレース(伏せたJSONと、ダウンロードしてブラウザで開くwaterfallのHTML) |
 | `docs/` | 手順書、設計書、調査メモ、ADR |
 
 ## 判断の記録
