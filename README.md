@@ -76,9 +76,11 @@ flowchart LR
 
 **AgentCoreの中継は呼び出し側の切断をエージェントに伝えず、MCPサーバのmicroVMは15分使われないとDB接続を閉じずに止まる。**
 
-| 止め方(4秒で切った質問) | エージェントの終わり | LLMの生成 |
+![止め方ごとに、切った後どこまで処理が続いたか](docs/img/cut.png)
+
+| 止め方(4〜5.2秒で切った質問) | エージェントの終わり | LLMの生成 |
 |---|---|---|
-| 何もしない | 35.8秒まで続けた | 最後まで |
+| 何もしない | 35.2秒まで続けた | 最後まで |
 | 切ったら`StopRuntimeSession`でセッションを止める | 34.4秒まで(合図の約30秒後) | 3回とも最後まで |
 | ＋ サーバが処理中の要求を待たない(uvicornの`timeout_graceful_shutdown=0`) | 切った時刻ごろに`cancelled` | 約1秒で止まった |
 
@@ -168,7 +170,7 @@ AWSでは`infra/`のTerraformで作り、`-var pitfalls=1,2`のように落と�
 |---|---|
 | `system/` | 観測対象のエージェント、自作MCPサーバ、業務ツールと合成データ、落とし穴の切り替え |
 | `tracing/` | 計装(spanの定義)、手元用の保存とwaterfall、公開用に伏せる処理 |
-| `scripts/` | 手元とAWSでの実行、トレースの書き出し、READMEの図(`plot_breakdown.py`) |
+| `scripts/` | 手元とAWSでの実行、トレースの書き出し、READMEの図(`plot_*.py`) |
 | `infra/` | Terraform(VPC・RDS・AgentCore・GPU) |
 | `traces/` | 手順書の根拠のトレース(伏せたJSONとwaterfallのHTML、事例ごとのフォルダ) |
 | `docs/` | 手順書、設計書、調査メモ、ADR |
