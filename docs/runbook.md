@@ -400,7 +400,7 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
   見え始め(3.6秒、11-07の基準の回の6問目)の約37%を占めた(新しいセッションの最初の検索だけ)。プールを`tools/list`で開き、
   最初のLLMの呼び出しの間に接続を作る(PR #36)。効果は、新しいセッションの最初の質問として6問目を流して確かめた(済み、2026-11-09、GPUの3回目)。
   S0・s2とも、最初の`tools/call retrieve_documents`は0.16秒で、埋め込みの後・`SELECT documents`の前に待ちが無かった(接続は`tools/list`の時点に作られていた)
-- 修正: プールは`open=False`で作り、最初の検索で開く([system/mcp_server/server.py](../system/mcp_server/server.py))。
+- 修正: プールは`open=False`で作り、最初の検索で開く([system/mcp_server/server.py](../system/mcp_server/server.py))。のちに、最初の`tools/list`で開くよう改めた(上の判断、PR #36)。
   `check`は、使わずに置いている間に切れた接続への守りとして残す。テストは[tests/test_pgvector_pool.py](../tests/test_pgvector_pool.py)
   (起動しただけでは接続が0本)
 - 修正の確かめ: 済み(2026-11-07、GPUの2回目)。新しいセッションの最初の検索(`tools/call retrieve_documents`)は、基準の回で1.33秒、
