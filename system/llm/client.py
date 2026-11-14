@@ -4,9 +4,11 @@ Streams the response so the client can see when the first token arrives
 (time to first token, TTFT): that is what a chat user waits for, and it is
 measurable against any OpenAI-compatible server. llama.cpp additionally
 reports its own server-side timings in the last chunk (tokens read from the
-prompt cache, prefill and decode time). Both go on the span, so a long
-prefill (#8), a long output (#9) and a missed prompt cache (#10) can be told
-apart, and client TTFT minus server prefill time shows what was spent outside
+prompt cache, prefill and decode time), and vLLM its per-request metrics and
+cached tokens (with --enable-per-request-metrics and
+--enable-prompt-tokens-details). Both go on the span, so a long prefill (#8),
+a long output (#9) and a missed prompt cache (#10) can be told apart, and
+client TTFT minus server prefill time shows what was spent outside
 the model (network, queueing).
 """
 from __future__ import annotations

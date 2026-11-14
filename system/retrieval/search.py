@@ -5,7 +5,7 @@ linear scan, IndexHNSWFlat is the approximate HNSW graph search. Using one
 library for both keeps the distance metric identical between them, which
 matters because brute-force's exact top-k doubles as recall@k's ground
 truth -- no extra labeling is needed to measure the accuracy #5's
-speedup costs (README "事例集" #5).
+speedup costs (case #5 in docs/runbook.md).
 """
 from __future__ import annotations
 import faiss

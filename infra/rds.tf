@@ -63,7 +63,7 @@ resource "aws_db_instance" "main" {
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
   publicly_accessible    = false
-  # Same AZ as the bastion (and later AgentCore), so no cross-AZ hop is mixed
+  # Same AZ as the bastion and AgentCore, so no cross-AZ hop is mixed
   # into the search latency.
   availability_zone = aws_subnet.private[0].availability_zone
 

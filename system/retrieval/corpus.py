@@ -6,7 +6,7 @@ distances (curse of dimensionality: every point is nearly equidistant
 from every other), which makes recall@k against such a corpus not
 representative of recall@k against real (clustered) embeddings. Points
 are drawn near one of n_clusters centers instead, so "nearest neighbor"
-is a meaningful, recoverable relationship (README "事例集" #5).
+is a meaningful, recoverable relationship (case #5 in docs/runbook.md).
 
 Corpus and queries must share the same cluster centers (a query should
 land near an actual cluster of corpus points, not an unrelated random
