@@ -1,4 +1,4 @@
-"""Which pitfalls (the case numbers in README's case list) are switched on.
+"""Which pitfalls (the case numbers in docs/runbook.md's case list) are switched on.
 
 Set with the environment variable PITFALLS, case numbers separated by commas
 (e.g. PITFALLS=3). Each process reads its own environment: a pitfall on the

@@ -1,7 +1,7 @@
 # 文書検索の文書
 
 `retrieve_documents`(文書検索のツール)が検索する文書。社内規程集の代わりに、公開されているひな形と法令を使う。
-`chunks.jsonl`は1行が1条で、`scripts/build_corpus.py`で作り直せる。
+`chunks.jsonl`は1行が1条で、`scripts/build_corpus.py`で作り直せる。AWSでは各条をTitan Text Embeddings V2で埋め込み(`scripts/embed_corpus.py`、ベクトルはコミットしない)、RDSのpgvectorに入れて検索する(`scripts/load_pgvector.py`)。
 
 | 文書 | 版 | 出典 |
 |---|---|---|

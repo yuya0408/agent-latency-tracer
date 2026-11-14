@@ -1,6 +1,6 @@
 # 設計書: agent-latency-tracer
 
-最終更新: 2026-11-07
+最終更新: 2026-11-14
 
 「今どこまでできていて、次に何をやるか」を把握するための設計書。目的・構成・事例集は
 [README.md](../README.md)、事例の出典は [latency-pitfalls-survey.md](latency-pitfalls-survey.md)。
@@ -20,8 +20,8 @@
 | エンジンのspanの中継 | GPUのEC2でOpenTelemetry Collectorのcontrib版を、版を固定して動かす。vLLMからgRPCで受け、`sigv4auth`で署名してOTLP/HTTPで`xray`の受付口へ送る。spanを加工する部品は入れない | vLLMの送信部品はSigV4で署名できず、受付口はgRPCを受けない。AWSのCollectorの手順に沿え、AWS以外の環境でも同じ形で使える。**採らなかった案**: CloudWatch agent(今のAWSの文書が大抵の場合に勧めており設定も短いが、利点の多くはここで使わない連携にある)。ADOT Collector(役割も設定もほぼ同じで、contrib版で動かなければ切り替える)。以前ADOTを外した理由はPython側のSDKの話で、Collectorの選定には当てはまらない |
 | 遅かった1件の見つけ方 | エージェントが質問ごとにtrace_idと所要時間を構造化ログに出す | 画面のトレースの一覧は索引(1%)に入ったものしか出ないので、「遅かった」と言われた1件はログからtrace_idを引いて開く(§5)。手順書の最初の段にする |
 | トレースの集め先 | CloudWatch(Transaction Search) | AgentCoreの基盤側のspanと同じ場所に集める。実務で標準的なやり方 |
-| Transaction Searchの設定 | `infra/account/`(状態ファイルは別のキー)で有効にし、段階ごとに消す`infra/`とは分けて残す。送り先はCloudWatch Logs、索引は初期値の1% | アカウントとリージョンに1つの設定。Terraformの説明では、送り先と索引のリソースを消してもAWS側の設定は戻らず、X-Rayに書き込みを許すログのリソースポリシーだけが消えて壊れる。spanを送らなければ費用はかからない。索引の割合は段階5で決める(§5) |
-| 手元からCloudWatchへの送信 | ADOTを使わず、OTel標準のOTLP/HTTPの送信部品に、botocoreでSigV4の署名をする`requests`のセッションを渡す(ADOTの`OTLPAwsSpanExporter`と同じ作り)。SQLiteへの保存は残し、CloudWatchは2つ目の送り先にする(`run_agent.py --cloudwatch`) | ADOTはOTelのSDKを1つの版に固定し、約50個の計装を一緒に入れ、TracerProviderを自分で組む前提で、このプロジェクトの`build_tracer_provider`と合わない。段階5のコンテナ(AgentCoreの公式の手順はADOTが前提)では見直す。SQLiteを残すのは「手元での開発」と同じ理由 |
+| Transaction Searchの設定 | `infra/account/`(状態ファイルは別のキー)で有効にし、段階ごとに消す`infra/`とは分けて残す。送り先はCloudWatch Logs、索引は初期値の1% | アカウントとリージョンに1つの設定。Terraformの説明では、送り先と索引のリソースを消してもAWS側の設定は戻らず、X-Rayに書き込みを許すログのリソースポリシーだけが消えて壊れる。spanを送らなければ費用はかからない。索引の割合は1%のまま上げない(§5で決めた) |
+| 手元からCloudWatchへの送信 | ADOTを使わず、OTel標準のOTLP/HTTPの送信部品に、botocoreでSigV4の署名をする`requests`のセッションを渡す(ADOTの`OTLPAwsSpanExporter`と同じ作り)。SQLiteへの保存は残し、CloudWatchは2つ目の送り先にする(`run_agent.py --cloudwatch`) | ADOTはOTelのSDKを1つの版に固定し、約50個の計装を一緒に入れ、TracerProviderを自分で組む前提で、このプロジェクトの`build_tracer_provider`と合わない。段階5のコンテナ(AgentCoreの公式の手順はADOTが前提)でも、ADOTは使わずに同じ送り方にした(§5)。SQLiteを残すのは「手元での開発」と同じ理由 |
 | 手元での開発 | AWS無しでも動く形を残す(検索はfaiss、トレースは自作SQLite＋waterfall) | 開発中の確認と、AWSを使わない読み手のため |
 | 事例の書き方 | 事例ごとに1ファイル。落とし穴ありと修正済みを並べる | 落とし穴のコードそのものが読めるようにする |
 | 公開する根拠 | トレースをJSONで書き出し、waterfall画像と一緒に`traces/`に置く。アカウントID・ARNは伏せる | 読み手がAWS無しで結果を確かめられるようにする |
@@ -30,28 +30,39 @@
 | 手元からRDSへの接続(作業用) | Session Managerのポート転送。踏み台のEC2(t4g.nano、公開IPなし、受け入れの許可なし)と、SSMのインターフェース型エンドポイント3つ(ssm・ssmmessages・ec2messages)を、1つ目のサブネットに置く。RDSと一緒に作って消す | 表を作る・データを入れる・測るための裏口で、本ランの経路(AgentCore→RDS)には入らない。AWSがRDS向けの手順を公式に出している定番。EC2 Instance Connect Endpointは無料だが、公式の手順はEC2向けだけで、RDSへ直接つなぐ例は第三者のものしかなく、使えるポートの記述も食い違っていたので採らなかった。SSHで入る公開の踏み台は、インターネットゲートウェイが要るので採らない |
 | RDSの設定 | PostgreSQL 18(小さい版の番号は固定しない)、db.t4g.medium(メモリ4GB)、パスワードはRDSに作らせSecrets Managerに置く(`manage_master_user_password`)、踏み台と同じAZ、バックアップなし | 18はRDSの初期設定。小さい版まで固定すると、その版が選べなくなったときに作れなくなるので、代わりに測るときの実際の版を§8に記録する。mediumは、表とHNSWのインデックスがメモリに収まる大きさ(一般的な選び方。収まらないとディスクの遅さが事例5に混ざる)。microでは表だけで`shared_buffers`に収まらなかった。パスワードが状態ファイルに入らない。AZをまたぐ1ms前後の遅れを検索の時間に混ぜない |
 | pgvectorの測定の条件 | 1024次元×10万件(合成ベクトル、seedは0)。HNSWのパラメータはpgvectorの初期値(`m=16`・`ef_construction=64`・`ef_search=40`)。質問100個、top-5。時間は`EXPLAIN (ANALYZE, TIMING OFF)`のDBの中の実行時間で、1周温めてから測る | 条件は結果を見る前に、現実の値から決めた(差が出るように逆算しない)。1024はTitan Text Embeddings V2の初期値・bge-m3・multilingual-e5-largeの次元。10万件は中規模の社内文書(5,000件×20チャンク程度)。top-5はMCPサーバの初期値。手元のfaiss(128次元×50万件)は遅さを見せるための逆算で、手元の確認用に残す |
-| AgentCore Runtimeのネットワーク | VPCモード。サブネットは1つ目(`apne1-az1`)だけ。インターフェース型エンドポイント4つ(`ecr.api`・`ecr.dkr`・`logs`・`xray`)を同じサブネットに置き、受け入れはRuntimeのセキュリティグループからだけ。実行ロールは公式の例から、ECRをこのリポジトリに絞り、Bedrockのモデルの権限と`logs:PutResourcePolicy`を外した | ecr・logsは、外への出口が無いVPCでは公式に必須。xrayはトレースをCloudWatchに送る受付口。AWSの推奨はAZの違う2つ以上のサブネットだが、可用性は目的の外で、RDSと別のAZに置かれるとAZをまたぐ遅れが検索に混ざるので1つにした(エンドポイントの費用もAZの数だけ倍になる)。Runtime本体は、中に入れる本物のイメージ(MCPサーバ)と一緒に段階5で作る |
-| エージェントの基本形 | 1回の応答で頼まれたツール呼び出しは`asyncio.gather`で同時に実行し、MCPの接続とツールの一覧は使い回す。システムプロンプトは付けない。LLMを呼ぶのは1回の質問につき最大10回。会話はセッションの間メモリに持ち、直近40メッセージを残す(2026-11-06から)。AWSでは、メッセージを足すたびにAgentCore Memory(短期の記憶)にも書き、プロセスにその会話が無いとき(新しいセッション、15分の後の新しいmicroVM)だけ読み戻す(2026-11-09から) | 事例の「直した書き方」の基準。10はOpenAI Agents SDKの`DEFAULT_MAX_TURNS`(LangChainは15、smolagentsは20)。日付をシステムプロンプトに入れる話は#10の事例で扱う。会話の持ち方はAgentCoreの公式のセッションの説明(セッションの間は状態を保ち、それを超えて残すならAgentCore Memory)に合わせ、40はStrands Agentsの既定(`SlidingWindowConversationManager(window_size=40)`)。GPUの1回目までは質問ごとに会話を捨てていた(事例はどれも同じ回の基準と比べるので、1回目の結果はそのまま読める)。Memoryの読み書きの形は、AWSの文書が紹介するStrands Agentsの連携(`AgentCoreMemorySessionManager`)に合わせた: エージェントを作るときに1回読み(`ListEvents`、strands-agents/sdk-python#1272)、メッセージごとに書く(`batch_size`の既定1)。保存は1メッセージ1イベントで、セッションはRuntimeのセッションID、利用者(`actorId`)はログインが無いので固定。長期の記憶(会話から事実を抜き出す)は抜き出しの精度の話になるので入れない。Memoryの書き込みは、11-09より前の回の基準には無い |
+| AgentCore Runtimeのネットワーク | VPCモード。サブネットは1つ目(`apne1-az1`)だけ。インターフェース型エンドポイント6つ(`ecr.api`・`ecr.dkr`・`logs`・`xray`、のちに`bedrock-agentcore`・`bedrock-runtime`)を同じサブネットに置き、受け入れはRuntimeのセキュリティグループからだけ。実行ロールは公式の例から、ECRをこのリポジトリに絞り、`logs:PutResourcePolicy`を外した。Bedrockのモデルの権限は、MCPサーバのロールにTitan Text Embeddings V2の`InvokeModel`だけを持たせた | ecr・logsは、外への出口が無いVPCでは公式に必須。xrayはトレースをCloudWatchに送る受付口。AWSの推奨はAZの違う2つ以上のサブネットだが、可用性は目的の外で、RDSと別のAZに置かれるとAZをまたぐ遅れが検索に混ざるので1つにした(エンドポイントの費用もAZの数だけ倍になる)。Runtime本体は、中に入れる本物のイメージ(MCPサーバ)と一緒に段階5で作った。`bedrock-agentcore`はエージェントからMCPサーバのRuntime・Memoryを呼ぶため、`bedrock-runtime`は質問の埋め込みのため |
+| エージェントの基本形 | 1回の応答で頼まれたツール呼び出しは`asyncio.gather`で同時に実行し、MCPの接続とツールの一覧は使い回す。システムプロンプトは付けない(#10の落とし穴を入れたときだけ、先頭に時刻を書く)。LLMを呼ぶのは1回の質問につき最大10回。会話はセッションの間メモリに持ち、直近40メッセージを残す(2026-11-06から)。AWSでは、メッセージを足すたびにAgentCore Memory(短期の記憶)にも書き、プロセスにその会話が無いとき(新しいセッション、15分の後の新しいmicroVM)だけ読み戻す(2026-11-09から) | 事例の「直した書き方」の基準。10はOpenAI Agents SDKの`DEFAULT_MAX_TURNS`(LangChainは15、smolagentsは20)。日付をシステムプロンプトに入れる話は#10の事例で扱う。会話の持ち方はAgentCoreの公式のセッションの説明(セッションの間は状態を保ち、それを超えて残すならAgentCore Memory)に合わせ、40はStrands Agentsの既定(`SlidingWindowConversationManager(window_size=40)`)。GPUの1回目までは質問ごとに会話を捨てていた(事例はどれも同じ回の基準と比べるので、1回目の結果はそのまま読める)。Memoryの読み書きの形は、AWSの文書が紹介するStrands Agentsの連携(`AgentCoreMemorySessionManager`)に合わせた: エージェントを作るときに1回読み(`ListEvents`、strands-agents/sdk-python#1272)、メッセージごとに書く(`batch_size`の既定1)。保存は1メッセージ1イベントで、セッションはRuntimeのセッションID、利用者(`actorId`)はログインが無いので固定。長期の記憶(会話から事実を抜き出す)は抜き出しの精度の話になるので入れない。Memoryの書き込みは、11-09より前の回の基準には無い |
 | LLMへのリクエスト | ストリーミングで受け、temperatureは0にする。`max_tokens`は付けない | ストリーミング: TTFTはllama.cpp以外のサーバでも測れ、チャットの体感の速さを決め、llama.cppの読み込み時間との差で通信などの分が分かる。temperature: llama.cppの初期値0.8では、同じ質問でツール呼び出しの数が2つになったり4つになったりした。`max_tokens`: 主なフレームワークは初期値で付けない。止まらない生成(§7の9)は#9の材料なので、基準の側で隠さない |
 | LLMの動かし方とモデルの大きさ | 事例の再現はGPUの8Bで行う。モデルの大きさは比べない | 手元のCPUで2Bを動かすと、1問18〜63秒のほとんどをLLMが占め、ツールの実行は1回1秒未満だった(§8)。事例の差(数十ミリ秒〜数秒)がLLMの時間に埋もれ、どの遅れが体感に効くかの比率が実際のサービス(GPUで推論)と大きく違う。答えの正しさは目的の外のまま。2026-10-11に「2Bのまま」と決めたが、この点を見落としていたため改めた |
+| 答えの返し方 | SSEで返し、15秒ごとに`: ping`を送る。呼び出し側の切断に気づいたら処理を止め、spanに`cancelled`を付ける(PR #37) | 見え始め(答えの文字が見え始めるまで)を測るため。チャットの一般的な形 |
+| 切断の後始末 | 呼び出し側が切ったら`StopRuntimeSession`でセッションを止める(PR #41)。エージェントのサーバは、止める合図(SIGTERM)で処理中の要求を待たない(uvicornの`timeout_graceful_shutdown=0`、PR #45) | AgentCoreの中継は切断をエージェントに伝えない([手順書](runbook.md)「利用者が切っても、エージェントが答えを最後まで作る」) |
+| AWSのクライアントの再試行 | botocoreのクライアントはすべて`standard`の再試行にする(PR #44)。質問を送るクライアントだけ、読み取り900秒・試行1回 | `StopRuntimeSession`の409(用意中・片づけ中)を文書どおり再試行するため。質問は2重に処理されないよう1回だけ送る(手順書「同じ質問が2重に処理される」) |
+| DBの接続プール | `open=False`で作り、最初の`tools/list`で開く(先に検索が来たら検索で開く。PR #25・#36)。渡す前に`check`で確かめる | 割り当て前に作った接続は使えない(手順書「割り当ての前に作ったDBの接続が、切れている」)。`tools/list`で開けば、最初のLLMの呼び出しの間に接続ができる |
+| テスト | PRとmainへのpushでpytestを回す(PR #48)。pgvectorはCIの中で立てたPostgreSQL | 外のサービスに頼らない。伏せたトレースに残してはいけない値が無いかも確かめる |
 
 ## 2. 全体の流れ
 
+```mermaid
+flowchart LR
+  U["利用者役のスクリプト<br/>(手元のPC)"] -->|"InvokeAgentRuntime<br/>(SigV4)"| AG
+  subgraph VPC["AWS 東京リージョン・VPC"]
+    AG["AgentCore Runtime<br/>agent.py(エージェントのループ)"]
+    LLM["GPUのEC2<br/>vLLM・Qwen3-8B<br/>＋ OTel Collector"]
+    MCP["AgentCore Runtime<br/>mcp_server/<br/>業務ツール(モック)・文書検索"]
+    DB["RDS<br/>PostgreSQL + pgvector"]
+    AG -->|"chat"| LLM
+    AG -->|"MCP(SigV4)"| MCP
+    MCP -->|"文書検索"| DB
+  end
+  AG -->|"会話の履歴"| MEM["AgentCore Memory"]
+  MCP -->|"質問の埋め込み"| TI["Bedrock<br/>Titan Text Embeddings V2"]
+  U & AG & MCP & LLM -.->|"span"| CW["CloudWatch<br/>Transaction Search"]
+  AG & MCP -.->|"基盤のspan"| CW
 ```
- 手元のPC                AWS(東京)
- ┌──────────────┐       ┌──────────────────────────────────────────────────────┐
- │ 利用者役の      │       │ VPC                                                  │
- │ スクリプト      │─Invoke─▶│ AgentCore Runtime: agent.py(エージェントループ)        │
- │(質問を投げる)  │ AgentRuntime│   ├ chat ─────────▶ GPUのEC2: 推論サーバ(Qwen3-8B)   │
- └──────────────┘ (SigV4) │   └ MCP+SigV4 ──▶ AgentCore Runtime: mcp_server/       │
-                         │                       ├ 業務ツール(モック)               │
-                         │                       └ 文書検索 ──▶ RDS(pgvector)      │
-                         │ CloudWatch: 基盤span・サーバ側span・エージェント側span  │
-                         └──────────────────────────────────────────────────────┘
- 段階5までは、エージェントとllama.cpp(2B)を手元に置き、MCPサーバだけをAgentCoreに置く
- 事例ごとに1か所だけ落とし穴ありに切り替える → CloudWatchで見え方を確かめる → docs/runbook.mdに書く、トレースをtraces/に書き出す
- 見分けられない → 計装を足す → 足す前と後を比べる
-```
+
+- 段階5までは、エージェントとllama.cpp(2B)を手元に置き、MCPサーバだけをAgentCoreに置いた
+- 事例ごとに1か所だけ落とし穴ありに切り替える → CloudWatchで見え方を確かめる → docs/runbook.mdに書き、トレースをtraces/に書き出す
+- 見分けられない → 計装を足す → 足す前と後を比べる
 
 ## 3. コンポーネントと状態
 
@@ -61,22 +72,30 @@
 | [tracing/exporter.py](../tracing/exporter.py) | spanをSQLiteに保存(手元用) | ✅ |
 | [tracing/aws_exporter.py](../tracing/aws_exporter.py) | spanをCloudWatch(Transaction Search)に送る。OTLP/HTTPとSigV4(依存は`aws`の組) | ✅ |
 | [tracing/viewer/waterfall.py](../tracing/viewer/waterfall.py) | 単一HTMLのwaterfall(手元用) | ✅ |
+| [tracing/published.py](../tracing/published.py) | `traces/`に置くトレースを伏せる。残す属性のキーを決め、残した値の中のアカウントID・ARNも置き換える | ✅ |
 | [system/tools/](../system/tools/) | 業務ツール4つの定義(`catalog.json`)、データの種類と項目(`data_schema.json`)、合成データ(`mock_data.json`)、モック実行(200〜800ms待ってから、合成データを条件で絞り・集計して返す) | ✅ |
 | [system/retrieval/](../system/retrieval/) | 手元用の検索(faiss)、合成ベクトルの生成 | ✅(合成ベクトルはpgvectorへの投入にも使う) |
-| [system/mcp_server/](../system/mcp_server/) | 自作MCPサーバ(低レベルAPI、Streamable HTTP、`/mcp`、ステートレス)。業務ツール＋文書検索`retrieve_documents`(faissかpgvector。RDSにはIAMのトークンでログイン)。AgentCore用のコンテナは`Dockerfile`。計装オンのときはHTTPリクエストごとのspan(`opentelemetry-instrumentation-asgi`)も出す。`MCP_SERVER_OTEL=0`で計装オフ | ✅ |
+| [system/tools/per_type.py](../system/tools/per_type.py) | 落とし穴M1のツール一覧(データの種類ごとに検索・1件取得・集計の45個。中では基準のツールに置き換えて実行する) | ✅ |
+| [system/pitfalls.py](../system/pitfalls.py) | 環境変数`PITFALLS`で入れる落とし穴を読み、resource属性`scenario.pitfalls`に記録する | ✅ |
+| [system/mcp_server/](../system/mcp_server/) | 自作MCPサーバ(低レベルAPI、Streamable HTTP、`/mcp`、ステートレス)。業務ツール＋文書検索`retrieve_documents`(faissかpgvector。pgvectorでは質問をTitan Text Embeddings V2で埋め込み、本文つきで上位10件(上限20)を返す。RDSにはIAMのトークンでログインし、接続プールは最初の`tools/list`で開く)。AgentCore用のコンテナは`Dockerfile`。計装オンのときはHTTPリクエストごとのspan(`opentelemetry-instrumentation-asgi`)も出す。`MCP_SERVER_OTEL=0`で計装オフ | ✅ |
 | [system/mcp_client.py](../system/mcp_client.py) | SDKの`Client`を包み、tool呼び出しを`execute_tool` spanで囲む。HTTPヘッダにも`traceparent`を載せる(`httpx2`の`event_hooks`)。AgentCoreのURLならSigV4で署名し、`Mcp-Session-Id`を送り返す(§7の12)。`async with`の間は接続を使い回す | ✅ |
 | [scripts/try_mcp.py](../scripts/try_mcp.py) | 手元の動作確認。ツール3つを「1つずつ」と「同時に」で呼び、waterfallを`out/`に出す | ✅ |
 | [scripts/run_agent.py](../scripts/run_agent.py) | 手元の動作確認。仮の質問(§6の3)をエージェントに流し、質問ごとのwaterfallを`out/`に出す | ✅ |
 | [scripts/gpu_prepare.sh](../scripts/gpu_prepare.sh)・[infra/gpu_prepare/](../infra/gpu_prepare/) | 仮のGPUサーバと、その中で動かす手順。イメージと重みを移し、本番と同じ経路で1回試す。ふだんは作らない。NVMeを使う形に直した後は動かしていない | ✅ |
 | [infra/gpu.tf](../infra/gpu.tf)・[infra/gpu_boot.sh.tftpl](../infra/gpu_boot.sh.tftpl) | VPCの中のGPUサーバ(vLLM＋Collector)と、起動手順。`terraform apply -target=aws_instance.gpu`で、要るエンドポイントごと作る | ✅ |
 | [system/serving/otel-collector.yaml](../system/serving/otel-collector.yaml) | Collectorの設定(§1) | ✅ |
-| [system/llm/](../system/llm/) | OpenAI互換クライアント。ストリーミングで受け、chat spanにTTFTとエンジンの内訳(llama.cppの`timings`、vLLMの`metrics`)を記録する。断片で届くツール呼び出しを組み立てる。HTTPヘッダに`traceparent`を載せる | ✅ |
+| [system/llm/](../system/llm/) | OpenAI互換クライアント。ストリーミングで受け、chat spanにTTFTとエンジンの内訳(llama.cppの`timings`、vLLMの`metrics`)、送ったツール定義の数を記録する。断片で届くツール呼び出しを組み立てる。HTTPヘッダに`traceparent`を載せる | ✅ |
 | [system/agent.py](../system/agent.py) | エージェントループ(§1の「エージェントの基本形」) | ✅ |
 | [system/agent_server.py](../system/agent_server.py)・[Dockerfile.agent](../Dockerfile.agent) | エージェントのHTTPの入口(AgentCore Runtimeの決まりに合わせ、ポート8080の`GET /ping`と`POST /invocations`)。受け取った`traceparent`のトレースに入り、セッションIDを`gen_ai.conversation.id`に記録する。接続先は環境変数で渡す(`MEMORY_ID`があればAgentCore Memoryを使う)。Runtimeは`infra/agentcore_agent.tf` | ✅ |
 | [system/memory.py](../system/memory.py) | AgentCore Memoryへの会話の読み書き(§1の「エージェントの基本形」)。呼び出しごとに`BedrockAgentCore.ListEvents`・`BedrockAgentCore.CreateEvent`のspan(AWS SDKの規約の名前)を作り、送り直しの回数を付ける | ✅ |
-| [scripts/invoke_agent.py](../scripts/invoke_agent.py) | 利用者役。Runtime上のエージェントに仮の質問を`InvokeAgentRuntime`で投げ、自分のspanの`traceparent`を付ける。質問ごとに新しいセッション | ✅ |
-| [infra/](../infra/) | Terraform(VPC・RDS・踏み台・AgentCore Runtime・基盤側のspanの配送)。`infra/account/`はTransaction Search。`infra/artifacts/`はイメージ(ECR。vLLM・Collector・MCPサーバ・エージェント)と重み(S3)の置き場で、段階ごとに消さない | ✅ |
-| `docs/runbook.md`・`traces/` | 手順書と根拠のトレース | ⬜ |
+| [scripts/invoke_agent.py](../scripts/invoke_agent.py) | 利用者役。Runtime上のエージェントに仮の質問を`InvokeAgentRuntime`で投げ、自分のspanの`traceparent`を付ける。既定は回の初めにセッションを温めて使い回す(`--cold`で質問ごとに新しいセッション)、`--concurrent`で同時に投げる、`--cut-after`で切って`StopRuntimeSession`で止める | ✅ |
+| [infra/](../infra/) | Terraform(VPC・RDS・踏み台・AgentCore Runtime・基盤側のspanの配送)。AgentCore Memory、VPCエンドポイント。`infra/account/`はTransaction Search。`infra/artifacts/`はイメージ(ECR。vLLM・Collector・MCPサーバ・エージェント)と重み(S3)の置き場で、段階ごとに消さない | ✅ |
+| [scripts/build_corpus.py](../scripts/build_corpus.py)・[embed_corpus.py](../scripts/embed_corpus.py)・[load_pgvector.py](../scripts/load_pgvector.py)・[measure_pgvector.py](../scripts/measure_pgvector.py) | 文書を条ごとに切る(`data/corpus/`)→ Titanで埋め込む → RDSに入れる。事例5の測定(HNSWなし/あり) | ✅ |
+| [scripts/export_trace.py](../scripts/export_trace.py) | トレースを手元のSQLiteかCloudWatchから読み、伏せたJSONとwaterfallのHTMLを`traces/`に書き出す | ✅ |
+| [scripts/collect_gpu.sh](../scripts/collect_gpu.sh) | destroyの前に、GPUサーバのログ・vLLMの`/metrics`・5秒ごとの記録を手元に回収する | ✅ |
+| [scripts/plot_breakdown.py](../scripts/plot_breakdown.py)・[plot_cut.py](../scripts/plot_cut.py) | READMEの図(1問の内訳、切断の止め方) | ✅ |
+| [tests/](../tests/)・[.github/workflows/test.yml](../.github/workflows/test.yml) | テスト(偽のLLM・偽のAWS・プロセス内のMCP。pgvectorはCIの中で立てたPostgreSQL)。PRとmainへのpushで回す | ✅ |
+| [docs/runbook.md](runbook.md)・[traces/](../traces/)・[docs/adr/](adr/) | 手順書、根拠のトレース、判断の記録 | ✅ |
 
 ## 4. span設計
 
@@ -84,27 +103,35 @@
 
 | span | 作るもの | 主な属性 |
 |---|---|---|
-| `invoke_agent` (root) | 自作(`agent.py`) | `gen_ai.agent.name`。上限で打ち切ると`error.type=max_turns_exceeded` |
-| `retrieval` | 自作 | `gen_ai.retrieval.top_k` |
+| `InvokeAgentRuntime`(CLIENT、root) | 自作(`scripts/invoke_agent.py`、サービス名`caller`) | `caller.time_to_first_text_ms`(呼び出し側で見た最初の文字)、`caller.warmup`、`caller.cut_after_s`(切った秒数) |
+| `StopRuntimeSession`(CLIENT) | 自作(同上) | 切った後にセッションを止める呼び出し |
+| `invoke_agent <名前>` | 自作(`agent.py`) | `gen_ai.agent.name`、`gen_ai.conversation.id`(RuntimeのセッションID)、`agent.time_to_first_text_ms`。上限で打ち切ると`error.type=max_turns_exceeded`、切られると`cancelled` |
 | `execute_tool <ツール名>` | 自作(`mcp_client.py`) | `gen_ai.tool.name`, `gen_ai.tool.call.id`, `mcp.method.name`, `mcp.protocol.version` |
-| `chat <モデル名>` | 自作(`llm/client.py`) | `gen_ai.usage.input_tokens` / `output_tokens`、`gen_ai.request.temperature`、`gen_ai.response.finish_reasons`、`llm.time_to_first_token_ms`(クライアント側のTTFT)、`llamacpp.prompt_n` / `cache_n` / `prompt_ms` / `predicted_n` / `predicted_ms`(llama.cppの内訳)、`vllm.queue_time_ms` / `time_to_first_token_ms` / `generation_time_ms` / `mean_itl_ms` / `tokens_per_second` / `cached_tokens`(vLLMの内訳) |
+| `chat <モデル名>` | 自作(`llm/client.py`) | `gen_ai.usage.input_tokens` / `output_tokens`、`gen_ai.request.temperature`、`gen_ai.response.finish_reasons`、`llm.time_to_first_token_ms`(クライアント側のTTFT)、`llamacpp.prompt_n` / `cache_n` / `prompt_ms` / `predicted_n` / `predicted_ms`(llama.cppの内訳)、`vllm.queue_time_ms` / `time_to_first_token_ms` / `generation_time_ms` / `mean_itl_ms` / `tokens_per_second` / `cached_tokens`(vLLMの内訳)、`llm.request.tool_count`(送ったツール定義の数) |
+| `llm_request`(SERVER) | vLLM(OTel Collector経由) | エンジンの中の待ち行列・プリフィル・デコード。親は`chat`が送った`traceparent` |
+| `BedrockAgentCore.ListEvents` / `CreateEvent`(CLIENT) | 自作(`memory.py`、AWS SDKの規約の名前) | `agent.memory.events`(読み戻した件数)、`botocore.retry_attempts` |
 | `MCP send <メソッド>`(CLIENT) | SDK(手元側) | `mcp.method.name`, `jsonrpc.request.id`。この中で`params._meta`に`traceparent`を書き込む |
 | `POST /mcp`(SERVER) | `opentelemetry-instrumentation-asgi`(サーバ側) | HTTPリクエストを受け取ってから応答を返し終わるまで。親はHTTPヘッダの`traceparent` |
 | `<メソッド>`(SERVER、例: `tools/call find_records`) | SDK(サーバ側のmiddleware) | `mcp.method.name`, `mcp.protocol.version`, `gen_ai.tool.name`, `error.type` |
+| `embeddings amazon.titan-embed-text-v2:0`(CLIENT) | 自作(`mcp_server/server.py`) | `gen_ai.usage.input_tokens`、`gen_ai.embeddings.dimension.count`、`botocore.retry_attempts` |
+| `SELECT documents`(CLIENT) | 自作(同上) | `db.system.name`、`db.query.text`(値を含まない)、`db.response.returned_rows`、`retrieval.document_ids` / `scores` / `text_chars`(本文は残さない) |
+| `AgentCore.Runtime.Invoke`(SERVER) | AgentCoreの基盤 | `aws.operation.name`、`latency_ms`、`session.id`。エージェントとMCPサーバのRuntimeそれぞれに出る |
 
 - SDKのspanはグローバルのTracerProviderに送られる。登録しないと捨てられ、`traceparent`も送られない
   (`set_global_tracer_provider`)
 - HTTP越しでは`execute_tool` → `MCP send tools/call` → サーバの`tools/call`の3段が1本のトレースになる。
   HTTPを使わない接続(テストで使う)では`MCP send`が作られず、サーバのspanが`execute_tool`の直下につく
 - 2026-07-28版のMCPにはあいさつ(`initialize`)もセッションIDも無い。最初の`server/discover`は版の問い合わせだけ
+- resource属性: `service.name`、`scenario.pitfalls`(入れた落とし穴)、`process.creation.time`(プロセスの起動時刻。新しいmicroVMかどうか)を全spanに付ける
+- `retrieval` spanの組み立て(`retrieval_span`)は`tracing/instrumentation.py`にあるが、今の検索は`embeddings`と`SELECT`の2本で記録し、`retrieval`は作っていない
 
-### 足すもの
+### 基盤のメトリクスと、記録していないもの
 
-- **MCPサーバ側**: 検索ツールの中のDBクエリのspan
-- **AgentCoreの基盤側**(AWSが出す): `InvokeAgentRuntime` span(`latency_ms`、`session.id`)、
-  メトリクス(`Latency`、`SessionCount`等)。AgentCoreが付ける`Mcp-Session-Id`は`mcp.session.id`に記録する
+- AgentCoreの基盤のメトリクス(`Latency`、`Invocations`、`Sessions`等)は、spanとは別にCloudWatchのメトリクスで読む。
+  何が映り何が映らないかは手順書の「気づき方(メトリクス)」
+- AgentCoreが付ける`Mcp-Session-Id`は、自作のspanには記録していない(`mcp.session.id`の定数だけある)。セッションは基盤のspanの`session.id`で読む
 
-### 見分けにくいと予想している組み合わせ(再現して確かめる)
+### 見分けにくいと予想していた組み合わせ(結果は手順書)
 
 | 組み合わせ | 予想される見え方 | 見分けるのに要りそうなもの |
 |---|---|---|
@@ -120,10 +147,12 @@
   `AgentCore.Runtime.Invoke`(`aws.operation.name`が`InvokeAgentRuntime`、`latency_ms`・`session.id`付き)。
   クライアントが送った`traceparent`を親にし、コンテナの`POST /mcp`はその子になる。Runtimeのトレースを有効にするのは、
   CloudWatch Logsの配送(送り元`TRACES`、送り先`XRAY`)でTerraformから書けた(公式のSDKの例はmemoryとgatewayだけを挙げていた)。
-  ヘッダの許可リストには`traceparent`・`tracestate`を入れた(入れない場合に届くかは試していない)
+  ヘッダの許可リストには`traceparent`・`tracestate`を入れた(入れない場合に届くかは確かめなかった)
 - VPCモードのとき、コンテナからCloudWatchにトレースを送る経路(2026-10-28に解決): `xray`のインターフェース型
   エンドポイント経由で届いた(NATなし)。実行ロールに`xray:PutSpans`が要る
-- AgentCore Runtimeの課金(待機中にも費用がかかるか)
+- AgentCore Runtimeの課金(待機中にも費用がかかるか)(2026-11-14に公式の料金ページで確認): セッションの間だけかかる。V1はvCPU 1時間$0.0895・
+  メモリ1GB 1時間$0.00945を1秒単位で、microVMの用意からセッションの終了まで(使われない時間を含む)数える。I/O待ちの間はCPUがゼロになる
+  (この記述は版を分けていない)。セッションが無いときの課金は書かれていない。実額では、Runtimeを消した11-12・11-13のAgentCoreは$0
 - 手元からCloudWatchにOTLPで送るときの受付口の仕様と署名の方法(2026-10-26に解決): 受付口は
   `https://xray.<リージョン>.amazonaws.com/v1/traces`で、OTLP/HTTP(protobuf)だけを受け、gRPCは受けない。署名はSigV4で、
   サービス名は`xray`。Transaction Searchが有効でないと受け付けない
@@ -143,10 +172,10 @@
   - 閲覧用のIAMユーザーには、AWS管理ポリシー`CloudWatchReadOnlyAccess`が要る。画面は索引外のトレースを
     `xray:StartTraceRetrieval`で取り出しており、これが無いと開けない
   - 割合を上げる案は採らない。1%を超える分は索引に入れたspanの数で課金され、索引は条件(サービス名など)では絞れず
-    割合しか指定できない。費用自体は小さい見込み(公式価格での概算で、Runtimeを1か月置いて100%にしても約2ドル。東京の単価は未確認)
+    割合しか指定できない。費用自体は小さい見込み(公式価格での概算で、Runtimeを1か月置いて100%にしても約2ドル。東京の単価は索引に入れたspan 100万本あたり$0.75で、2026-11-14に価格表APIで確認)
 - RDSで使えるpgvectorのバージョン(2026-10-25に解決): 東京のRDS for PostgreSQL 18系では0.8.1(18.1〜18.3)・
   0.8.2(18.4以降)。初期設定の18.3では0.8.1だった(§8)
-- この PC の CPU で llama.cpp の小さいモデルがどれくらいの速さで動くか(ツール定義入りのプロンプトで)
+- この PC の CPU で llama.cpp の小さいモデルがどれくらいの速さで動くか(ツール定義入りのプロンプトで)(2026-10-07に解決): §8の「llama.cpp(Qwen3.5-2B)」
 - **AgentCoreのセッションID**(2026-10-28に解決): 2026-07-28版のMCPにはセッションが無いので、SDKのクライアントは送り返さない。AgentCoreの振り分けに要るので、自作のクライアントで送り返す(§7の12)
 - **AgentCoreに載せるときのサーバ設定**(2026-10-28に解決): `stateless_http=True`、ホストは`0.0.0.0`、ARM64のコンテナ
 - **ツールの結果に中身を持たせるか**(2026-10-08に解決): `{"status": "ok"}`だけを返すモックでは、LLMが作り話をしたり
@@ -236,14 +265,14 @@
     待ち行列の時間を含まないので、クライアント側のTTFTとは別の名前で記録する。Prometheusの`/metrics`はCloudWatchに送らず、
     事例の前後で保存する(目的は気づいた後の切り分けで、事例の前後の差で足りる。常に動かす監視は、作って消すこの構成と合わない。
     各事例が既定のメトリクスに映るかは、手順書の「気づき方」に書いた)
-- [ ] 6. 事例を1つずつ再現し、手順書に書き、トレースを書き出す。事例ごとに「症状 → 最初に立てた仮説 → 決め手になったspan・属性」の
+- [x] 6. 事例を1つずつ再現し、手順書に書き、トレースを書き出す。事例ごとに「症状 → 最初に立てた仮説 → 決め手になったspan・属性」の
   形で書く(§7の2・12の書き方)。M2は§7の12で実際に起きたので、再現し直さずその記録から書く。#3も§7の4で起きたが、エージェントループ(と`invoke_agent` span)を
   作る前でspanが無いので、手元の2Bで再現し直した(2026-11-04)。同じ形のモック(`PITFALLS=3`)で6回流して繰り返しは0回で、
-  8Bの回に回す([手順書](runbook.md)の3)。#12の並行数は、
+  8Bの回に回す([手順書](runbook.md)の3。8Bでも注入では起きず、基準の回で自然に1回起きた)。#12の並行数は、
   想定する利用者の数から先に決める
   - [x] #12の並行数(2026-11-04)。同時に処理中の質問の数は「質問が来る頻度 × 1問の時間」(リトルの法則)で見積もる。
     仮定は、1人が1日に3問を8時間の中で聞く、1問20秒、繁忙時は平均の3倍(どれも仮定で、測っていない。1問の時間は8Bで
-    まだ測っておらず、段階6の最初の回で確かめる。ADR-0003)。
+    まだ測っておらず、段階6の最初の回で確かめる。ADR-0003。→ GPUの1回目で中央値約23.5秒、§8)。
 
     | 利用者 | 平均の同時数 | 繁忙時 | 繁忙時の99%点 |
     |---|---|---|---|
@@ -261,7 +290,7 @@
     この規模で待ち行列が効かなければ、それも結果として書く(vLLMは複数のリクエストを1つの束で計算するので、KVに収まるうちは待たせない。
     その場合も、GPUを分け合う分だけ1トークンの時間`mean_itl_ms`が伸びるかを見る)。台数や並行数を振って限界を探すことはしない
     (`toolcall-serving-bench`の範囲)。手順書の#12は「まず並行数を見積もる」から始める。
-    KVは22,976トークン(16,384トークンの文脈で1.40本分、§8)。1問の入力の長さは8Bではまだ測っていない(1問4,000トークンなら6問で約24,000)
+    KVは22,976トークン(16,384トークンの文脈で1.40本分、§8)。1問の入力の長さは8Bではまだ測っていない(1問4,000トークンなら6問で約24,000。→ GPUの1回目で1回の呼び出しが約1,300〜3,600トークン、§8)
   - [x] Runtimeでの切り替え(2026-11-04)。Terraformの変数`pitfalls`(例: `-var pitfalls=1,2`)を、両方のRuntimeに同じ`PITFALLS`として渡す。
     各プロセスは自分の側の番号だけ効き、両方のspanの`scenario.pitfalls`に同じ値が残るので、トレースがどの回のものかを自分で示す。
     空(基準の回)のときは変数自体を渡さない。値を変えて`apply`すると両方のRuntimeが更新される(反映までの時間は1回目で確かめる)
@@ -319,7 +348,7 @@
       ただし条件は等しいかどうかしか書けない(1エンドポイント1ツールで包むサーバによくある形)ので、範囲の条件が要る質問
       (「2026年9月の」「10月中」)では道筋そのものが変わりうる(2026-11-07、レビューで指摘)。2回目はこのまま流し、答えについては何も言えなかった
       (手順書のM1)。その後、日付と数値の項目に`<項目>_from`・`<項目>_to`(その値を含む)を足し、基準のツールと同じ範囲を書けるようにした。
-      元のAPIに期間の指定があれば、包んだツールにも出るのが普通なので、再現としてもこちらが忠実。次にGPUを使う段階で、種類ごとのツールの回を1回足す
+      元のAPIに期間の指定があれば、包んだツールにも出るのが普通なので、再現としてもこちらが忠実。次にGPUを使う段階で、種類ごとのツールの回を1回足す(→ GPUの3回目で流した。結果は手順書のM1)
     - **会話**: 回ごとに1つのセッションで、温め用の質問に続けて6問を順に聞く。エージェントは会話を持つので、後の質問ほど入力が長い。
       1回目の記録から見積もると、6問で会話が約4,200トークン積み上がり、最後の質問の入力は約5,500〜6,000、M1では約14,000(文脈は16,384)。
       #10では、この積み上がった会話も毎回読み直すことになる
@@ -337,7 +366,7 @@
     - **順番**: 土台 → GPU → 基準 → `apply`で#10 → M1 → #10とM1 → 落とし穴を外し、基準の質問を1問流して条件がずれていないかを確かめる
       → `collect_gpu.sh` → destroy。RDSは1,000件・HNSWなし(検索の速さはこの回の対象ではなく、10万件の投入に約10分かかるため)
     - **回ごとに残すもの・確かめること**: 1回目と同じ。`apply`のたびに両側のspanの`scenario.pitfalls`、M1ではMCPサーバの`tools/list`が46個か
-- [ ] 7. RAGを本物にする(2026-11-07に計画)。文書検索が本文を返すようにし、waterfallで「埋め込み → SELECT → 次のLLMの入力が増える」を見せる。
+- [x] 7. RAGを本物にする(2026-11-07に計画)。文書検索が本文を返すようにし、waterfallで「埋め込み → SELECT → 次のLLMの入力が増える」を見せる。
   埋め込みモデルの比較と、検索の精度の評価はしない。今の検索は、本文の無い合成データ1,000件から質問のハッシュでベクトルを選んでいる
   - **文書**: 社内規程集の代わりに、公開されているひな形と法令を数本(モデル就業規則(厚労省、令和7年12月版)・旅費法(国家公務員等の旅費に関する法律)・
     育児・介護休業等に関する規則の規定例・労働基準法など。本数は中身を確かめて決める)。モデル就業規則には出張・旅費の条が無く、
@@ -438,8 +467,8 @@
     使われない時間の設定を短くすれば待ちは減るが、既定の15分で起きることを見るので変えない
   - **費用の見込み**: 文書の埋め込みは約$0.02(us-east-1の$0.02/100万トークンで計算。東京は未確認)。エンドポイントは1時間約$0.014
     (11-05の請求から出した値)で1回4時間なら約$0.06。GPUの回は前回並みの約$2〜3
-  - **まだ確かめていないこと**: 東京のTitan V2の単価と、モデルの利用を有効にする操作が要るか(育児・介護休業の規定例の掲載ページと利用条件は、[data/corpus/README.md](../data/corpus/README.md)に出典・加工した旨と一緒に書いた)。
-    日本語1字がTitanとQwenでそれぞれ何トークンになるか
+  - **まだ確かめていないこと**(2026-11-14に確かめた): 東京のTitan V2の単価は入力1,000トークンあたり$0.000029(価格表API)。モデルの利用を有効にする操作は要らなかった(11-07の時点でAUTHORIZED)。(育児・介護休業の規定例の掲載ページと利用条件は、[data/corpus/README.md](../data/corpus/README.md)に出典・加工した旨と一緒に書いた)。
+    日本語1字がTitanとQwenでそれぞれ何トークンになるか: 文書214条(66,824字)で、Titan V2は77,970トークン(1字約1.17)、Qwen3-8Bのトークナイザは49,160トークン(1字約0.74)
 
 ## 7. 動かしていて見つかったこと(手順書の「自然に発生」の候補)
 
@@ -496,7 +525,7 @@
 11. **CloudWatchへの同期の送信は、中身の無い親spanを537msにした。** 試しのスクリプトで、親spanの中で子spanを1本作って
     閉じただけで、`SimpleSpanProcessor`では親が537msになった。子spanが終わるたびに、署名とHTTPSの送信を呼び出し元で
     待つため。2(SQLiteの約67ms)と同じ形で、1桁大きい。`batch=True`では起きない。手元からAWSまでの往復が含まれるので、
-    同じリージョンの中から送れば小さくなると推測しているが、確かめていない
+    同じリージョンの中から送れば小さくなると推測しているが、確かめなかった(どのプロセスも`batch=True`で送るので、今の構成には関係しない)
 12. **AgentCore上のMCPサーバへのリクエストが、毎回コールドスタートしていた。** `try_mcp.py`が31秒かかり、基盤側のspanを
     並べると、8回のリクエストがすべて別の`session.id`で、うち4回は`latency_ms`が5〜7秒だった(コンテナの`POST /mcp`は数ms)。
     2026-07-28版のMCPにはセッションが無く、SDKのクライアントは仕様どおりIDを送らない。一方でAgentCoreの振り分けは
@@ -509,7 +538,7 @@
     もう一度送られ、AgentCoreは同じセッションで2つ目の処理を始めた。1つ目は止まらず上限まで動いた。手元のspanは1つで、基盤側のspanが2つ並んで分かった。
     `invoke_agent.py`を読み取りタイムアウト900秒・試行1回にした。詳細は[手順書](runbook.md)
 14. **MCPサーバの接続プールが、切れたRDSの接続を渡した(2026-11-05)。** 約1時間動いていたプロセスで、検索が`SSL error: unexpected eof`で失敗した。
-    渡す前に確かめる`check=AsyncConnectionPool.check_connection`を足した。誰が切ったかは未確認
+    渡す前に確かめる`check=AsyncConnectionPool.check_connection`を足した。誰が切ったかは未確認(→ 11-06に、AgentCoreが割り当ての前に起動したコンテナで作った接続だと分かった。手順書「割り当ての前に作ったDBの接続が、切れている」)
 15. **temperature 0でも、道筋が回ごとに変わる質問がある(2026-11-05)。** 「品目X001の入荷待ちの発注は?」は4回でLLM 2〜10回(上限)・14〜115秒。
     落とし穴の前後は、LLMの呼び出しの回数がそろった質問で比べる
 16. **新しいセッションでも、遅れは約1秒だった(2026-11-05)。** `--cold`で温めた回より約1秒長いだけ。予想(5〜7秒)より小さい。
@@ -550,7 +579,7 @@
   - 時計: 11:43ごろまで、手元とAWSの時計が約1.2秒ずれていた(§7の20)
   - destroyでは、これまでと同じくVPC・サブネット・SG 2がENIのために残った(無料)。時間を置いて消し直す
   - 回収: destroyの前に、Runtimeのロググループ全体、RDSの接続ログ、GPUの記録を手元に書き出した
-  - 費用: 翌日以降にCost Explorerで確かめる
+  - 費用: 11-09のUTCの1日で合計約$2.13(EC2 $1.31、AgentCore $0.30。クレジットを除く、Cost Explorerの概算の値、2026-11-14に確認)
 
 - **GPUの2回目(2026-11-07、g6.xlarge・1c、vLLM 0.31.0、Qwen3-8B bf16、イメージはコミットddb9336)**。GPUは03:37〜04:19 UTCの約40分。在庫切れは無し
   - 土台のapply(60個)は12分、GPUとエージェントのRuntimeのapplyは6分。vLLMの準備完了はapplyの終わりから約8分。KVは22,976トークン
@@ -570,10 +599,10 @@
   - Terraformの差分: S3のゲートウェイエンドポイントのポリシーが、applyのたびに更新として出た。このポリシーだけ`Version`を書いておらず、
     AWSが`"2008-10-17"`を足して保存するため。プロバイダは意味が同じなら差分にしないが、`Version`の有無は意味の違いとして扱われ、
     AWSが返した形(1要素を文字列で書く)がそのまま差分に出た。ほかのポリシーと同じく`Version = "2012-10-17"`を書いた(2026-11-07)。
-    差分が消えたかは、次に土台を作ったときのplanで確かめる
+    差分が消えたかは、次に土台を作ったときのplanで確かめる(→ 11-08のGPUなしの回で、作った直後のplanは変更なし)
   - destroyでは、1回目と同じく`agentic_ai`型ENI 2つが残り、VPC・サブネット1・SG 2が残った
   - 回収: destroyの前に、Runtimeのロググループ全体、RDSの接続ログ、GPUの記録(`collect_gpu.sh`)を手元に書き出した
-  - 費用: 翌日以降にCost Explorerで確かめる
+  - 費用: 11-07のUTCの1日で合計約$1.66(EC2 $0.99、AgentCore $0.33。クレジットを除く、Cost Explorerの概算の値、2026-11-14に確認)
 
 - **GPUの1回目(2026-11-05、g6.xlarge・1c、vLLM 0.31.0、Qwen3-8B bf16)**。GPUは07:14〜08:35 UTCの約1時間20分、全体で約3時間(在庫待ち約40分を含む)
   - g6.xlargeの在庫が、ap-northeast-1c(apne1-az1)と1a(apne1-az4)の間で交互に切れた。1cで約35分、1aで約25分取れず、1cに戻して取れた。
@@ -617,7 +646,7 @@
 - Terraformの土台(VPC等7つ): applyもdestroyも約1分。消した直後は、札で探すAPI(Resource Groups Tagging API)に
   消したものがしばらく残る。消し忘れの確認は、IDを指定して直接問い合わせる
 - このアカウントのAZの名前とID: `1a=apne1-az4`、`1c=apne1-az1`、`1d=apne1-az2`
-- RDS(2026-10-25、db.t4g.micro、パラメータは初期設定): PostgreSQL 18.3(aarch64)、pgvector 0.8.1。`shared_buffers`約180MB、
+- RDS(2026-10-25、当時のdb.t4g.micro、パラメータは初期設定): PostgreSQL 18.3(aarch64)、pgvector 0.8.1。`shared_buffers`約180MB、
   `effective_cache_size`約360MB、`maintenance_work_mem` 64MB、`work_mem` 4MB、`max_parallel_maintenance_workers` 2
 - Terraform(土台＋踏み台＋SSM＋RDS＋AgentCoreの受け皿、36個、2026-10-26): applyは約6分、destroyは約5分
 - Terraform(土台＋踏み台＋SSMのエンドポイント＋RDS、23個): applyは約7分(RDSが5分42秒)、destroyは約4分(インターフェース型
@@ -636,7 +665,7 @@
   - KV: 22,976トークン(`Maximum concurrency for 16,384 tokens: 1.40x`)。EBSからとNVMeからの2回とも同じ。読み込み後のGPU使用は23,034MiBのうち19,832MiB。
     ベンチの通常の値30,240より少ないのは、起動時のコンパイル(`torch.compile`)のキャッシュが無いため(2026-11-01にログで確認)。ベンチのbf16のログ28本で、キャッシュが無い7本は`peak activation` 1.61GiB(記録のある6本)・KV 3.16GiB・22,992トークン、
     キャッシュがある21本は0.62GiB・4.15GiB・30,240トークンで、例外は無かった。こちらのログもコンパイル37秒・1.61GiB・3.16GiB。キャッシュはコンテナの中(`/root/.cache/vllm`)に置かれるので、`docker run`で作り直すと毎回無い状態になる。
-    なので新しいコンテナでは毎回22,976トークンで安定するが、**同じコンテナを`docker restart`すると約30,000トークンに増えるはず**(未確認)。事例の間でサーバを起動し直すときは、コンテナを作り直してKVをそろえる。16トークンの差は`--max-model-len`(8192と16384)かもしれないが、KVの差の大部分はこれでは説明できない
+    なので新しいコンテナでは毎回22,976トークンで安定するが、**同じコンテナを`docker restart`すると約30,000トークンに増えるはず**(確かめなかった。事例の回は毎回コンテナを作り直した)。事例の間でサーバを起動し直すときは、コンテナを作り直してKVをそろえる。16トークンの差は`--max-model-len`(8192と16384)かもしれないが、KVの差の大部分はこれでは説明できない
   - 転送: イメージの取得約6分、ECRへのpushと取り直し約6分、重みのHFからの取得2分10秒とS3へのアップロードで合計約18分、S3から1分47秒(ルートのEBSへ)
   - ECRの大きさ: vLLM 9.04GB、Collector 0.12GB。重みはS3に16.4GB、15ファイル。保管は合わせて月約$1.3
   - 応答(ツール1つ、162トークン): TTFT 84ms、`queue_time_ms` 0.02〜0.05ms、`mean_itl_ms`約60ms、2回目は`cached_tokens` 160でTTFT 65ms。
@@ -646,7 +675,7 @@
   - 起動から応答できるまで12分半。起動手順の開始まで1分半、イメージの取得と重みのコピーで約6分、vLLMの起動で約4分半。KVは今回も22,976トークン
   - トレース: 手元の`LlmClient`からSession Managerのポート転送で呼び、2本とも`chat`(手元)→`llm_request`(vLLM)が同じトレースに入った。Collectorのログにエラーは無かった。
     `llm_request`は`vllm.tracing.otel`が出すSERVERのspanで、`gen_ai.latency.time_in_queue`・`time_in_model_prefill`・`time_in_model_decode`・`e2e`などを持つ
-  - `chat`の親に、手元のサービス名で同じ長さの`InternalOperation`というspanが`aws/spans`に入っていた。自作のコードには無いspanで、手元の記録(in-memory)にも無い。誰が足したかは調べていない
+  - `chat`の親に、手元のサービス名で同じ長さの`InternalOperation`というspanが`aws/spans`に入っていた。自作のコードには無いspanで、手元の記録(in-memory)にも無い。CloudWatchが親の無いspanの上に付けるもので、つながりには影響しない(§6の5b)
   - TTFT(各3回、ポート転送越し): 文章の応答はクライアント118〜194ms・vLLM 61〜71ms、ツールを呼ぶ応答はクライアント596〜623ms・vLLM 64〜65ms(§7の10)
 - **AgentCore Runtime(2026-10-28)**:
   - イメージ(ARM64、python:3.14-slim)は約121MB。手元(QEMUで代わりに実行)でのビルドとpushに6〜7分

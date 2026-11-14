@@ -1,6 +1,7 @@
 # Interface endpoints that let the SSM Agent on the bastion reach Systems
 # Manager without internet access. Paid per hour per subnet, so they sit in
-# the bastion's subnet only and go away with it (AgentCore adds its own later).
+# the bastion's subnet only and go away with it (AgentCore has its own, in
+# agentcore_endpoints.tf).
 
 resource "aws_security_group" "ssm_endpoints" {
   name   = "agent-latency-tracer-ssm-endpoints"

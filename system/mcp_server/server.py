@@ -127,7 +127,7 @@ class _TitanEmbedder:
     which takes a while and would block, while it opens no connection until the
     first request. That request comes after AgentCore assigns the session, so
     no socket made before the assignment is used (the DB pool waits for the
-    first search for the same reason). For that reason there is no warm-up call.
+    first tools/list for the same reason). For that reason there is no warm-up call.
 
     invoke_model is synchronous and runs in a thread: called directly it would
     hold up the event loop, which is pitfall #2's shape, in the baseline."""
