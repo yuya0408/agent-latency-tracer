@@ -111,7 +111,7 @@ flowchart LR
   AG -->|"会話の履歴"| MEM["AgentCore Memory"]
   MCP -->|"質問の埋め込み"| TI["Bedrock<br/>Titan Text Embeddings V2"]
   U & AG & MCP & LLM -.->|"自作の計装のspan"| CW["CloudWatch<br/>Transaction Search"]
-  VPC -.->|"基盤のspan<br/>(AgentCore.Runtime.Invoke)"| CW
+  AG & MCP -.->|"基盤のspan<br/>(AgentCore.Runtime.Invoke)"| CW
 ```
 
 | 部品 | 実装 |
