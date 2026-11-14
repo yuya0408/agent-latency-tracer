@@ -100,17 +100,18 @@ flowchart LR
 flowchart LR
   U["利用者役のスクリプト<br/>(手元のPC)"] -->|"InvokeAgentRuntime"| AG
   subgraph VPC["AWS 東京リージョン・VPC"]
-    AG["AgentCore Runtime<br/>エージェント"]
-    LLM["GPUのEC2<br/>vLLM・Qwen3-8B"]
+    AG["AgentCore Runtime<br/>自作のエージェント"]
+    LLM["GPUのEC2<br/>vLLM・Qwen3-8B<br/>＋ OTel Collector"]
     MCP["AgentCore Runtime<br/>自作MCPサーバ"]
     DB["RDS<br/>PostgreSQL + pgvector"]
-    MEM["AgentCore Memory"]
     AG -->|"chat"| LLM
     AG -->|"MCP"| MCP
-    AG -->|"会話の履歴"| MEM
-    MCP -->|"文書検索"| DB
+    MCP -->|"SELECT"| DB
   end
-  U & AG & MCP & LLM -.->|"span"| CW["CloudWatch<br/>Transaction Search"]
+  AG -->|"会話の履歴"| MEM["AgentCore Memory"]
+  MCP -->|"質問の埋め込み"| TI["Bedrock<br/>Titan Text Embeddings V2"]
+  U & AG & MCP & LLM -.->|"自作の計装のspan"| CW["CloudWatch<br/>Transaction Search"]
+  VPC -.->|"基盤のspan<br/>(AgentCore.Runtime.Invoke)"| CW
 ```
 
 | 部品 | 実装 |
