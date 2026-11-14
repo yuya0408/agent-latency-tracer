@@ -23,10 +23,11 @@ from system.agent import Agent
 from system.llm.client import LlmClient
 from system.mcp_client import McpToolClient
 from tracing.exporter import exporters_from_env
-from tracing.instrumentation import build_tracer_provider, get_tracer, set_global_tracer_provider
+from tracing.instrumentation import BATCH_EXPORT_INTERVAL_MS, build_tracer_provider, get_tracer, set_global_tracer_provider
 
 # MCP_SERVER_URL: e.g. the AgentCore URL from `terraform output mcp_server_url`
 SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://127.0.0.1:8000/mcp")
+# JAEGER_UI: where the printed links point
 JAEGER_UI = os.environ.get("JAEGER_UI", "http://localhost:16686")
 
 # For checking that the loop works end to end, not a fixed evaluation set;
@@ -74,6 +75,9 @@ async def main(numbers: list[int]) -> None:
             print(json.dumps(result.answer, ensure_ascii=False))
 
     provider.shutdown()  # send spans still queued
+    # The server's spans are sent by its own batch worker, at most one
+    # interval after they end.
+    await asyncio.sleep(2 * BATCH_EXPORT_INTERVAL_MS / 1000)
     for n, trace_id in trace_ids.items():
         print(f"Q{n}: {JAEGER_UI}/trace/{trace_id}")
 

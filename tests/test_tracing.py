@@ -15,10 +15,12 @@ import time
 from datetime import datetime, timezone
 
 import pytest
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import SpanKind, StatusCode
 
+from tracing.exporter import exporters_from_env
 from tracing.instrumentation import (
     build_tracer_provider,
     chat_span,
@@ -238,3 +240,12 @@ def test_spans_carry_when_the_process_started(exporter):
         started = datetime.fromisoformat(span.resource.attributes["process.creation.time"])
         assert started.tzinfo is not None
         assert started <= datetime.now(timezone.utc)
+
+
+def test_spans_go_to_otlp_unless_told_otherwise(monkeypatch):
+    monkeypatch.delenv("TRACE_TO", raising=False)
+    (exporter,) = exporters_from_env()
+    assert isinstance(exporter, OTLPSpanExporter)
+    monkeypatch.setenv("TRACE_TO", "sqlite")
+    with pytest.raises(ValueError, match="sqlite"):
+        exporters_from_env()
