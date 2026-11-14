@@ -16,7 +16,7 @@ AWSの振る舞い(AgentCore Runtimeの中継・セッション・メトリク�
 | ツールのspanが階段状に並ぶ | #1 逐次await / #2 asyncの中のブロッキング | #1はエージェント側の`execute_tool`の開始が階段状。#2はエージェント側の開始がそろい、サーバ側の`POST /mcp`・`tools/call`の開始が階段状 | 確認済み |
 | `MCP send`がサーバの`tools/call`より長い | 計装の保存がイベントループを止める / 通信 | `POST /mcp`の中か、計装をオフにすると消えるか | 確認済み |
 | `MCP send`と`tools/call`の始まりの間に隙間 | サーバの内部の`tools/list` | HTTPの層のspan | 確認済み |
-| MCPの呼び出しが毎回5〜7秒かかる | M2 毎回のコールドスタート | 基盤側のspanの`session.id`が毎回違うか | 確認済み |
+| MCPの呼び出しが毎回5〜8秒かかる | M2 毎回のコールドスタート | 基盤側のspanの`session.id`が毎回違うか | 確認済み |
 | chatのTTFTが長い | #8 長い入力 / ツール名のパーサ待ち | `vllm.time_to_first_token_ms`(サーバ側)も長いか | パーサ側は確認済み |
 | 温めた後もTTFTが長い | #10 プロンプトの先頭が毎回変わる / M1 ツール定義の膨張と、先頭の変化が重なる | `vllm.cached_tokens`が16前後か。`llm.request.tool_count`と入力の長さ | 確認済み |
 | chatが長いがTTFTは短い | #9 長い出力 / 止まらない生成 | `output_tokens`・`finish_reasons` | 確認済み(2B) |
@@ -235,12 +235,15 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
 - 症状: `try_mcp.py`の8回の呼び出しに31秒かかった。サーバの`POST /mcp`はどれも数ms
 - 最初の仮説: 記録に無い
 - 決め手: 基盤側の`AgentCore.Runtime.Invoke`を並べると、8回すべて`session.id`が違い、
-  うち4回は`latency_ms`が5〜7秒だった。サーバ側のspanだけでは見えない
+  うち4回は`latency_ms`が5.3〜7.7秒だった。サーバ側のspanだけでは見えない
 - 原因: 2026-07-28版のMCPにはセッションが無く、SDKのクライアントは`Mcp-Session-Id`を送り返さない。
   AgentCoreはこのIDでmicroVMを振り分けるので、呼び出しのたびに新しいmicroVMが起動した
 - 修正: クライアントで`Mcp-Session-Id`を送り返す。8回とも同じセッションになり、31秒が5.6秒に、
   基盤側は24〜989msになった
 - 修正の確かめ: 済み(上の31秒→5.6秒)
+- 根拠のトレース: [送り返す前](../traces/mcp-session-id/before.html)、[送り返した後](../traces/mcp-session-id/after.html)。
+  `try_mcp.py`の1回分(4トレース)を1枚にまとめた。呼び出し側のspanは残っていないので、基盤とサーバのspanだけで、
+  その範囲は28.6秒→4.0秒(31秒と5.6秒は呼び出し側で測った値)
 - 似た症状との見分け: [調査メモ](latency-pitfalls-survey.md)のM2(要求ごとにMCPセッションを張り直す)は、同じ症状で原因が別。
   `server/discover`・`tools/list`のspanが毎回出るかで分かれる見込み(未再現)
 
