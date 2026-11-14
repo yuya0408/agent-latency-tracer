@@ -103,13 +103,13 @@ flowchart LR
     AG["AgentCore Runtime<br/>自作のエージェント"]
     LLM["GPUのEC2<br/>vLLM・Qwen3-8B<br/>＋ OTel Collector"]
     MCP["AgentCore Runtime<br/>自作MCPサーバ"]
-    DB["RDS<br/>PostgreSQL + pgvector"]
+    DB["RDS<br/>PostgreSQL + pgvector<br/>(文書214条をTitanで<br/>埋め込んだベクトル)"]
     AG -->|"chat"| LLM
     AG -->|"MCP"| MCP
-    MCP -->|"SELECT"| DB
+    MCP -->|"②ベクトルが近い条を探す"| DB
   end
   AG -->|"会話の履歴"| MEM["AgentCore Memory"]
-  MCP -->|"質問の埋め込み"| TI["Bedrock<br/>Titan Text Embeddings V2"]
+  MCP -->|"①質問を埋め込む"| TI["Bedrock<br/>Titan Text Embeddings V2"]
   U & AG & MCP & LLM -.->|"自作の計装のspan"| CW["CloudWatch<br/>Transaction Search"]
   AG & MCP -.->|"基盤のspan<br/>(AgentCore.Runtime.Invoke)"| CW
 ```
