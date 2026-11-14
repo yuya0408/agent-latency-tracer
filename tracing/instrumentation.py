@@ -10,9 +10,8 @@ parts such as error.type/server.*). These conventions are still under
 may shift upstream -- re-check the spec before relying on this module for
 anything beyond this project.
 
-Design choice ("規約は借りる、パイプラインは自分で書く"): this module only
-builds spans and sets attributes via the OTel SDK/API. Collection, storage,
-and visualization are custom (see exporter.py, viewer/).
+This module only builds spans and sets attributes via the OTel SDK/API.
+Where they go is exporter.py: OTLP to Jaeger locally, or to CloudWatch.
 """
 
 from __future__ import annotations
@@ -116,9 +115,9 @@ def build_tracer_provider(
 
     batch=False (SimpleSpanProcessor): each span is exported synchronously the
     moment it ends, on the calling thread. Deterministic, so tests use it --
-    but the write blocks the event loop, and a SQLite commit after an idle
-    gap took ~67ms on this PC, which delayed every tool response by that much
-    (docs/DESIGN.md §7). With CloudWatch it is worse: every span waits for its
+    but the write blocks the event loop: with the SQLite file used early on,
+    a commit after an idle gap took ~67ms on this PC, which delayed every tool
+    response by that much (docs/DESIGN.md §7). With CloudWatch it is worse: every span waits for its
     own signed HTTPS request.
 
     batch=True (BatchSpanProcessor): ending a span only queues it; a worker

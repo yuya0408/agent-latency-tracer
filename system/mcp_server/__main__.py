@@ -2,9 +2,8 @@
 
 Environment variables:
   MCP_SERVER_OTEL  "0" turns server-side spans off (default "1")
-  TRACE_TO         where the spans go: "sqlite" (default), "cloudwatch", or both
-                   ("sqlite,cloudwatch"). cloudwatch needs the "aws" extra and AWS credentials
-  TRACE_DB         SQLite file the server's spans go to (default "traces.db")
+  TRACE_TO         where the spans go: "otlp" (default, Jaeger locally), "cloudwatch", or both
+                   ("otlp,cloudwatch"). cloudwatch needs the "aws" extra and AWS credentials
   MCP_SERVER_HOST  address to listen on (default "127.0.0.1"; the container sets "0.0.0.0")
   RETRIEVAL_BACKEND  "faiss" (default) or "pgvector"; pgvector reads PGHOST, PGUSER, ... like libpq,
                    and embeds the query with Bedrock in AWS_REGION (needs the "aws" extra)
@@ -55,8 +54,8 @@ def main() -> None:
     app = server.streamable_http_app(host=HOST, stateless_http=True)
     if otel:
         # One span per HTTP request, from receiving it to finishing the response.
-        # The per-message receive/send child spans are left out: each span costs
-        # a synchronous SQLite write (docs/DESIGN.md §7).
+        # The per-message receive/send child spans are left out: each span cost
+        # a synchronous write to the SQLite file used at the time (docs/DESIGN.md §7).
         app = HttpSpanMiddleware(app, exclude_spans=["receive", "send"])
     uvicorn.run(app, host=HOST, port=PORT)
     if provider is not None:

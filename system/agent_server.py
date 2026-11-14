@@ -17,7 +17,7 @@ Environment variables:
   MCP_SERVER_URL     MCP server (default http://127.0.0.1:8000/mcp)
   MEMORY_ID          AgentCore Memory to keep conversations in (system/memory.py);
                      unset, a conversation lives in the process only
-  TRACE_TO, TRACE_DB where the spans go (tracing.exporter.exporters_from_env)
+  TRACE_TO           where the spans go (tracing.exporter.exporters_from_env)
   AGENT_SERVER_HOST  address to listen on (default "127.0.0.1"; the container sets "0.0.0.0")
   PITFALLS           cases switched on in the agent (system/pitfalls.py)
 """

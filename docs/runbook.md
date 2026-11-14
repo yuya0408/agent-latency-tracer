@@ -3,8 +3,8 @@
 事例ごとに「症状 → 最初の仮説 → 決め手になったspan・属性 → 判断 → 修正 → 修正の確かめ」の順で書く。
 「修正の確かめ」は、直した後に同じ条件で症状が消えたのをトレースで見たか(済み・未・対象なし)。
 「起きる場所」は、どこでも起きる(コード・設定・LLMの性質による)か、この基盤だから起きる(AgentCore・クラウドのSDKなどの都合による)か。
-オンプレ側は測っていないので、一般的な情報と、手元だけで動かす形(llama.cpp・faiss・SQLite)で起きたかで判断した。
-根拠のトレースは[traces/](../traces/)に置く。waterfallのHTMLは、GitHubではソースが表示されるので、ダウンロードしてブラウザで開く。番号は下の[事例の一覧](#事例の一覧)の番号。
+オンプレ側は測っていないので、一般的な情報と、手元だけで動かす形(llama.cpp・faiss)で起きたかで判断した。
+根拠のトレースは[traces/](../traces/)に置く。図はJaegerのwaterfall(PNG)。JSONは標準のOTLP/JSONで、Jaegerなどに送ればそのまま開ける([README](../README.md#動かし方))。番号は下の[事例の一覧](#事例の一覧)の番号。
 AWSの振る舞い(AgentCore Runtimeの中継・セッション・メトリクス等)は、2026年11月時点、Runtime V1(初期値)で確かめたもの。サービス側の変更で変わりうる。
 
 ## 症状から引く表
@@ -103,7 +103,7 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
 - 修正: `asyncio.gather`で同時に呼ぶ(基準の書き方、[system/agent.py](../system/agent.py))
 - 修正の確かめ: 済み(基準の回。同じ質問で、`execute_tool`が同じ時刻に始まり、1問が約44秒から約42.5秒)
 - 似た症状との見分け: #2とは、どちら側が階段になるかで分かれる(下)。イベントループの遅延を測る計装は要らなかった
-- 根拠のトレース: [#1あり](../traces/1/gpu1-q2.html)、[基準](../traces/base/gpu1-q2.html)
+- 根拠のトレース: [#1あり](../traces/1/gpu1-q2.png)、[基準](../traces/base/gpu1-q2.png)
 
 ## 2 asyncの中のブロッキング呼び出し(同時に呼んでも順になる)
 
@@ -119,7 +119,7 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
 - 似た症状との見分け: #1はエージェント側が階段、#2はエージェント側がそろってサーバ側が階段。
   MCPサーバ側の計装が無いと、#2は「ツールの応答が遅い」としか見えない(エージェント側では、各`MCP send`がサーバでの処理より長くなる。
   `aggregate_records`は処理0.24秒に対して`MCP send`が0.54秒で、前の処理の終わりを待った分が乗る)
-- 根拠のトレース: [#2あり](../traces/2/gpu1-q2.html)、[基準](../traces/base/gpu1-q2.html)
+- 根拠のトレース: [#2あり](../traces/2/gpu1-q2.png)、[基準](../traces/base/gpu1-q2.png)
 
 ## 3 エージェントループの過剰反復(同じtoolを何度も呼ぶ)
 
@@ -135,7 +135,7 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
   その下の`execute_tool`の数。同じ質問でも、ほかの回はLLM 2〜6回で止まった
 - 修正: 反復回数の上限(今のエージェントにある)。上限で止まった答えは返らないので、その時間はまるごと無駄になる
 - 修正の確かめ: 上限が働くことは確かめた(自然に起きた回が115秒で止まった)。繰り返しそのものを減らす修正は無い
-- 根拠のトレース: [#3あり、「A社の未出荷の受注は?」](../traces/3/gpu1-q1.html)、[自然に上限まで繰り返した回(1つ目の処理)](../traces/retry-duplicate/gpu1-q5.html)
+- 根拠のトレース: [#3あり、「A社の未出荷の受注は?」](../traces/3/gpu1-q1.png)、[自然に上限まで繰り返した回(1つ目の処理)](../traces/retry-duplicate/gpu1-q5.png)
 
 ## 5 ベクトル検索のインデックスが無い
 
@@ -150,7 +150,7 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
 - 修正の確かめ: 済み(上のHNSWありの3回)
 - 似た症状との見分け: 下の「割り当ての前に作ったDBの接続が、切れている」は、新しいセッションの最初の1回だけ遅く、`SELECT documents`のspanは短い。
   こちらは毎回遅く、`SELECT documents`のspanそのものが長い
-- 根拠のトレース: [HNSWなし](../traces/5/no-hnsw.html)、[HNSWあり](../traces/5/hnsw.html)
+- 根拠のトレース: [HNSWなし](../traces/5/no-hnsw.png)、[HNSWあり](../traces/5/hnsw.png)
 
 ## 10 プロンプトの先頭が毎回変わり、プレフィックスキャッシュが効かない
 
@@ -170,7 +170,7 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
   会話を40メッセージで切った直後も1回だけ外れるが、そのときは`input_tokens`が前の呼び出しより減る(今回は起きなかった)
 - 見落としやすい点: 6問の合計時間では比べられない。6問中5問でLLMの呼び出しの回数が変わった(全体で12回 → 15回)。本当の日付が入ったことが
   効いたのかは確かめていない。呼び出しごとの値で読む
-- 根拠のトレース: [先頭の時刻あり、「A社の未出荷の受注と、品目X001の在庫は?」](../traces/10/gpu2-q2.html)、[基準](../traces/base/gpu2-q2.html)
+- 根拠のトレース: [先頭の時刻あり、「A社の未出荷の受注と、品目X001の在庫は?」](../traces/10/gpu2-q2.png)、[基準](../traces/base/gpu2-q2.png)
 
 ## 12 同時に来た質問が、推論サーバの待ち行列で待たされる
 
@@ -194,7 +194,7 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
   6本が同時に乗ったのは約3秒だけで、ほとんどの時間はツールを待つ質問がLLMから降りていた。6本のときも
   preemptionは0回だったので、KVに収まっていた(各時点のKVの使用量そのものは見ていない)
 - 修正の確かめ: 対象なし(待ちが起きなかった)
-- 根拠のトレース: [6問同時のうち「A社の未出荷の受注と、品目X001の在庫は?」](../traces/12/gpu1-q2-concurrent.html)
+- 根拠のトレース: [6問同時のうち「A社の未出荷の受注と、品目X001の在庫は?」](../traces/12/gpu1-q2-concurrent.png)
 
 ## M1 ツール定義が膨らむ(データの種類ごとのツール)
 
@@ -225,8 +225,8 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
     基準と同じ誤り。出張旅費は、基準が検索せずに終わり([設計書](DESIGN.md)の§7の17の件)、こちらは検索して答えた
   - 書けること: 2回目の「0件」は、ツールが増えたせいではなく、条件が書けなかったせいとみられる。この6問では、種類ごとのツールにしても
     答えは基準より悪くならなかった。各1回で、temperature 0でも回が独立しないので、どちらの答えが良いとは言えない
-- 根拠のトレース: [種類ごとのツールあり、温め用の質問](../traces/M1/gpu2-warmup.html)、[種類ごとのツールあり、「A社の未出荷の受注と、品目X001の在庫は?」](../traces/M1/gpu2-q2.html)、
-  [先頭の時刻と種類ごとのツールの両方、同じ質問](../traces/10-M1/gpu2-q2.html)、[範囲を足した後、温め用の質問](../traces/M1/gpu3-warmup.html)、[範囲を足した後、未出荷の受注と在庫](../traces/M1/gpu3-q2.html)
+- 根拠のトレース: [種類ごとのツールあり、温め用の質問](../traces/M1/gpu2-warmup.png)、[種類ごとのツールあり、「A社の未出荷の受注と、品目X001の在庫は?」](../traces/M1/gpu2-q2.png)、
+  [先頭の時刻と種類ごとのツールの両方、同じ質問](../traces/10-M1/gpu2-q2.png)、[範囲を足した後、温め用の質問](../traces/M1/gpu3-warmup.png)、[範囲を足した後、未出荷の受注と在庫](../traces/M1/gpu3-q2.png)
 
 ## M2 MCPサーバへの呼び出しが、毎回コールドスタートする
 
@@ -241,7 +241,7 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
 - 修正: クライアントで`Mcp-Session-Id`を送り返す。8回とも同じセッションになり、31秒が5.6秒に、
   基盤側は24〜989msになった
 - 修正の確かめ: 済み(上の31秒→5.6秒)
-- 根拠のトレース: [送り返す前](../traces/mcp-session-id/before.html)、[送り返した後](../traces/mcp-session-id/after.html)。
+- 根拠のトレース: [送り返す前](../traces/mcp-session-id/before.png)、[送り返した後](../traces/mcp-session-id/after.png)。
   `try_mcp.py`の1回分(4トレース)を1枚にまとめた。呼び出し側のspanは残っていないので、基盤とサーバのspanだけで、
   その範囲は28.6秒→4.0秒(31秒と5.6秒は呼び出し側で測った値)
 - 似た症状との見分け: [調査メモ](latency-pitfalls-survey.md)のM2(要求ごとにMCPセッションを張り直す)は、同じ症状で原因が別。
@@ -383,7 +383,7 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
   タイムアウトをエージェントの最長の処理より長くし、再送するなら前の処理を止める仕組みとセットにする
 - 修正の確かめ: 済み(修正の後に流し直した同じ質問は68.6秒かかり、エージェントの基盤側の`AgentCore.Runtime.Invoke`は1つだけだった)
 - 見落としやすい点: 呼び出し側の記録だけでは「1回で75秒」にしか見えない。基盤側のspanが無ければ気づけなかった
-- 根拠のトレース: [「品目X001の入荷待ちの発注は?」](../traces/retry-duplicate/gpu1-q5.html)
+- 根拠のトレース: [「品目X001の入荷待ちの発注は?」](../traces/retry-duplicate/gpu1-q5.png)
 
 ## 自然に発生: 割り当ての前に作ったDBの接続が、切れている
 
@@ -427,9 +427,9 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
 - 似た症状との見分け: M2(毎回のコールドスタート)とは、遅れがMCPサーバの中(`tools/call`の中で`SELECT documents`が始まるまで)にあるかで分かれる
 - 見落としやすい点: 手元や、起動直後のテストでは起きない。待ち時間の合計は、プールの接続の数で決まる(4本なら0+1+2+4秒)。
   データベースに限らず、起動時に作って使い回す接続(HTTPのクライアント等)は同じ影響を受けうる
-- 根拠のトレース: [失敗した「出張旅費の精算のルールは?」(11-05)](../traces/dead-pool-connection/gpu1-q6.html)、
-  [`check`ありで7.6秒かかった最初の検索(11-06)](../traces/dead-pool-connection/warm-container.html)、
-  [修正後の最初の検索、1.33秒(11-07)](../traces/dead-pool-connection/gpu2-first-search.html)
+- 根拠のトレース: [失敗した「出張旅費の精算のルールは?」(11-05)](../traces/dead-pool-connection/gpu1-q6.png)、
+  [`check`ありで7.6秒かかった最初の検索(11-06)](../traces/dead-pool-connection/warm-container.png)、
+  [修正後の最初の検索、1.33秒(11-07)](../traces/dead-pool-connection/gpu2-first-search.png)
 
 ## 自然に発生: 利用者が切っても、エージェントが答えを最後まで作る
 
@@ -481,9 +481,9 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
   - vLLM 0.31.0は、クライアントが切った要求を`request_success_total`(`finished_reason="abort"`を含む)にも、`e2e_request_latency_seconds`にも数えない
     (ソースで、取り消した要求は状態から外すだけ)。止まったことはvLLMのログの`Running`か、送った呼び出しの数と終わった数の差で見る
   - 「切った後も続いた」ことは、呼び出し側とエージェントのspanが同じトレースにつながっていて初めて見える
-- 根拠のトレース: [4秒で切った質問(11-09)](../traces/disconnect/gpu3-cut.html)、[止めるだけで直す前(11-11)](../traces/disconnect/gpu4-cut-before-fix.html)、
-  [LLMの呼び出し中に止めた](../traces/disconnect/gpu4-cut-llm.html)、[ツール待ちで止めた](../traces/disconnect/gpu4-cut-tool.html)、
-  [その後の続きの質問](../traces/disconnect/gpu4-cut-tool-follow.html)
+- 根拠のトレース: [4秒で切った質問(11-09)](../traces/disconnect/gpu3-cut.png)、[止めるだけで直す前(11-11)](../traces/disconnect/gpu4-cut-before-fix.png)、
+  [LLMの呼び出し中に止めた](../traces/disconnect/gpu4-cut-llm.png)、[ツール待ちで止めた](../traces/disconnect/gpu4-cut-tool.png)、
+  [その後の続きの質問](../traces/disconnect/gpu4-cut-tool-follow.png)
 
 ## 観察: temperature 0でも、道筋が回ごとに変わる質問がある
 
@@ -613,5 +613,5 @@ M4は、データを作り足す手間に比べて確かめられることが#8�
   その分microVMとDBの接続が残り続け、上の「DBの接続が1〜6分残る」の数が増える
 - 見落としやすい点: MCPサーバのログの時刻はspanより6〜8秒遅い(取り込みの時刻)。補充の`Started server process`は、割り当ての直後に出るので、
   その要求のための起動に見える。どのプロセスが受けたかは、ログのストリーム名(プロセスごと)か、spanの`process.creation.time`で見る
-- 根拠のトレース: [S1の検索(11-09)](../traces/mcp-after-idle/gpu3-s1-search.html)、[S0の続き(11-09)](../traces/mcp-after-idle/gpu3-s0-follow.html)、
-  [20分空けた後の新しいセッション(11-11)](../traces/mcp-after-idle/gpu4-after-20min-new.html)、[Runtimeを作った直後(11-11)](../traces/mcp-after-idle/gpu4-just-created.html)
+- 根拠のトレース: [S1の検索(11-09)](../traces/mcp-after-idle/gpu3-s1-search.png)、[S0の続き(11-09)](../traces/mcp-after-idle/gpu3-s0-follow.png)、
+  [20分空けた後の新しいセッション(11-11)](../traces/mcp-after-idle/gpu4-after-20min-new.png)、[Runtimeを作った直後(11-11)](../traces/mcp-after-idle/gpu4-just-created.png)

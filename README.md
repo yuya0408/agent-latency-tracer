@@ -4,7 +4,7 @@ LLM(vLLM・Qwen3-8B)・自作のMCPサーバ・RAG(pgvector)を持つPython製�
 **遅れや失敗にどんな問題が加わるか**を調べた。呼び出し側から基盤・LLM・DBまでをOpenTelemetry(GenAI・MCPの規約)で1本のトレースにつなぎ、
 入れた落とし穴8件・作る途中で自然に起きたもの9件・観察5件の計22件について、原因を切り分けて、どこでも起きるものと、この基盤だから起きるものに分けた。切り分け方は[手順書](docs/runbook.md)にまとめた。
 
-> 運用改善の実績ではない(トラフィックは合成で、事例の一部はわざと入れた落とし穴)。オンプレは測っておらず、「どこでも起きる」かは一般的な情報と、手元だけの構成(llama.cpp・faiss・SQLite)で起きたかで判断した。
+> 運用改善の実績ではない(トラフィックは合成で、事例の一部はわざと入れた落とし穴)。オンプレは測っておらず、「どこでも起きる」かは一般的な情報と、手元だけの構成(llama.cpp・faiss)で起きたかで判断した。
 
 ```mermaid
 flowchart LR
@@ -56,7 +56,7 @@ flowchart LR
 | 15分以上空けた後の、最初のツール呼び出し | +0.55〜0.85秒(原因は未確認) | 空けた後の1回だけ |
 | **MCPのセッションIDを送り返さないとき** | **新しいmicroVMの起動で、試験スクリプトの要求8回中4回が5〜8秒(8回の計31秒が、送り返すと5.6秒)** | ツール1回ごと |
 
-オンプレでも中継や履歴の保存にあたる部品は残るので、この約1秒がそのまま無くなるわけではない。最後の行は、AgentCoreがセッションIDでmicroVMを振り分けるのに、MCP(2026-07-28版)のクライアントがIDを送り返さないために起きた([awslabs/agentcore-samples#2264](https://github.com/awslabs/agentcore-samples/issues/2264)で報告)。根拠: [このトレースのwaterfall](traces/base/gpu4-q2.html)、[IDを送り返す前後のwaterfall](traces/mcp-session-id/)、手順書の[M2](docs/runbook.md#m2-mcpサーバへの呼び出しが毎回コールドスタートする)・[新しいセッションの約1秒](docs/runbook.md#観察-新しいセッションでも遅れは約1秒)。
+オンプレでも中継や履歴の保存にあたる部品は残るので、この約1秒がそのまま無くなるわけではない。最後の行は、AgentCoreがセッションIDでmicroVMを振り分けるのに、MCP(2026-07-28版)のクライアントがIDを送り返さないために起きた([awslabs/agentcore-samples#2264](https://github.com/awslabs/agentcore-samples/issues/2264)で報告)。根拠: [このトレースのwaterfall](traces/base/gpu4-q2.png)、[IDを送り返す前後のwaterfall](traces/mcp-session-id/)、手順書の[M2](docs/runbook.md#m2-mcpサーバへの呼び出しが毎回コールドスタートする)・[新しいセッションの約1秒](docs/runbook.md#観察-新しいセッションでも遅れは約1秒)。
 
 ---
 
@@ -154,16 +154,18 @@ flowchart LR
 
 ## 動かし方
 
-AWSを使わずに、MCPサーバとエージェントを手元で動かせる(検索はfaiss、トレースは自作のSQLite保存と単一HTMLのwaterfall)。
+AWSを使わずに、MCPサーバとエージェントを手元で動かせる(検索はfaiss、トレースはJaegerで見る)。
 
 ```bash
 # Linux(WindowsではWSL)で。venvは ~/.venvs/agent-latency-tracer に作り、pip install -e ".[dev]"
-export TRACE_DB=~/traces/traces.db          # 測定中の書き込みが遅くならないよう、Linux側のディスクに置く
+docker run -d --rm --name jaeger -p 16686:16686 -p 4318:4318 cr.jaegertracing.io/jaegertracing/jaeger:2.22.0
 # ターミナル1: MCPサーバ(127.0.0.1:8000/mcp)。落とし穴を入れるなら PITFALLS=2 などを付ける
 ~/.venvs/agent-latency-tracer/bin/python -m system.mcp_server
-# ターミナル2: 仮の質問をエージェントに流し、質問ごとのwaterfallをout/に出す(llama.cppを127.0.0.1:8080で起動しておく)
+# ターミナル2: 仮の質問をエージェントに流し、質問ごとにJaegerで開くURLを出す(llama.cppを127.0.0.1:8080で起動しておく)
 ~/.venvs/agent-latency-tracer/bin/python scripts/run_agent.py
 ```
+
+`traces/`のJSONも、同じJaegerに送れば開ける(`curl -H 'Content-Type: application/json' --data-binary @traces/base/gpu4-q2.json http://localhost:4318/v1/traces`)。
 
 AWSでは`infra/`のTerraformで作り、`-var pitfalls=1,2`のように落とし穴を選ぶ(作り方・消し方は[設計書](docs/DESIGN.md)の§6・§8)。
 
@@ -172,10 +174,10 @@ AWSでは`infra/`のTerraformで作り、`-var pitfalls=1,2`のように落と�
 | 場所 | 中身 |
 |---|---|
 | `system/` | 観測対象のエージェント、自作MCPサーバ、業務ツールと合成データ、落とし穴の切り替え |
-| `tracing/` | 計装(spanの定義)、手元用の保存とwaterfall、公開用に伏せる処理 |
+| `tracing/` | 計装(spanの定義)、送り先の切り替え(手元はJaeger、AWSはCloudWatch)、公開用に伏せる処理 |
 | `scripts/` | 手元とAWSでの実行、トレースの書き出し、READMEの図(`plot_*.py`) |
 | `infra/` | Terraform(VPC・RDS・AgentCore・GPU) |
-| `traces/` | 根拠のトレース(伏せたJSONと、ダウンロードしてブラウザで開くwaterfallのHTML) |
+| `traces/` | 根拠のトレース(伏せたOTLP/JSONと、JaegerのwaterfallのPNG) |
 | `docs/` | 手順書、設計書、調査メモ、ADR |
 
 ## 判断の記録

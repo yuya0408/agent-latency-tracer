@@ -1,459 +1,1116 @@
 {
- "trace_id": "6af1b67700df4971e208a8768cc0e896",
- "spans": [
+ "resourceSpans": [
   {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "26aa8e374398573c",
-   "parent_span_id": "4b5669df1f3988de",
-   "name": "InvokeAgentRuntime",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1794225783624974152,
-   "end_time_unix_nano": 1794225799987410186,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "caller.time_to_first_text_ms": 4264.130254974589
-   },
    "resource": {
-    "service.name": "caller"
-   }
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "caller"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "26aa8e374398573c",
+       "parentSpanId": "4b5669df1f3988de",
+       "name": "InvokeAgentRuntime",
+       "kind": 3,
+       "startTimeUnixNano": "1794225783624974152",
+       "endTimeUnixNano": "1794225799987410186",
+       "attributes": [
+        {
+         "key": "caller.time_to_first_text_ms",
+         "value": {
+          "doubleValue": 4264.130254974589
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "4b5669df1f3988de",
+       "name": "InternalOperation",
+       "kind": 2,
+       "startTimeUnixNano": "1794225783624974152",
+       "endTimeUnixNano": "1794225799987410186",
+       "attributes": [],
+       "status": {
+        "code": 0
+       }
+      }
+     ]
+    }
+   ]
   },
   {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "4b5669df1f3988de",
-   "parent_span_id": null,
-   "name": "InternalOperation",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1794225783624974152,
-   "end_time_unix_nano": 1794225799987410186,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {},
    "resource": {
-    "service.name": "caller"
-   }
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "agent_latency_tracer_agent.DEFAULT"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "ee2ac78e4f97f827",
+       "parentSpanId": "26aa8e374398573c",
+       "name": "AgentCore.Runtime.Invoke",
+       "kind": 2,
+       "startTimeUnixNano": "1794225784244000000",
+       "endTimeUnixNano": "1794225784311000000",
+       "attributes": [
+        {
+         "key": "latency_ms",
+         "value": {
+          "intValue": "25"
+         }
+        },
+        {
+         "key": "http.status_code",
+         "value": {
+          "intValue": "200"
+         }
+        },
+        {
+         "key": "aws.operation.name",
+         "value": {
+          "stringValue": "InvokeAgentRuntime"
+         }
+        },
+        {
+         "key": "http.method",
+         "value": {
+          "stringValue": "POST"
+         }
+        },
+        {
+         "key": "http.response.status_code",
+         "value": {
+          "intValue": "200"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "34fd17a1-1b50-40ea-b691-57124c16164e"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      }
+     ]
+    }
+   ]
   },
   {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "ee2ac78e4f97f827",
-   "parent_span_id": "26aa8e374398573c",
-   "name": "AgentCore.Runtime.Invoke",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1794225784244000000,
-   "end_time_unix_nano": 1794225784311000000,
-   "status_code": "OK",
-   "status_description": null,
-   "attributes": {
-    "latency_ms": 25,
-    "http.status_code": 200,
-    "aws.operation.name": "InvokeAgentRuntime",
-    "http.method": "POST",
-    "http.response.status_code": 200,
-    "session.id": "34fd17a1-1b50-40ea-b691-57124c16164e"
-   },
    "resource": {
-    "service.name": "agent_latency_tracer_agent.DEFAULT"
-   }
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "agent"
+      }
+     },
+     {
+      "key": "scenario.pitfalls",
+      "value": {
+       "stringValue": "none"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "6f24e06e881ce00f",
+       "parentSpanId": "ee2ac78e4f97f827",
+       "name": "invoke_agent agent",
+       "kind": 1,
+       "startTimeUnixNano": "1794225784307952260",
+       "endTimeUnixNano": "1794225799645634586",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "34fd17a1-1b50-40ea-b691-57124c16164e"
+         }
+        },
+        {
+         "key": "agent.time_to_first_text_ms",
+         "value": {
+          "doubleValue": 3391.3192320001144
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "d80715717e3ca3d7",
+       "parentSpanId": "6f24e06e881ce00f",
+       "name": "BedrockAgentCore.CreateEvent",
+       "kind": 3,
+       "startTimeUnixNano": "1794225784308009459",
+       "endTimeUnixNano": "1794225784401658291",
+       "attributes": [
+        {
+         "key": "rpc.method",
+         "value": {
+          "stringValue": "CreateEvent"
+         }
+        },
+        {
+         "key": "botocore.retry_attempts",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "rpc.system.name",
+         "value": {
+          "stringValue": "aws-api"
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "cc57475e18c14327",
+       "parentSpanId": "6f24e06e881ce00f",
+       "name": "chat Qwen/Qwen3-8B",
+       "kind": 3,
+       "startTimeUnixNano": "1794225784401750948",
+       "endTimeUnixNano": "1794225786606788080",
+       "attributes": [
+        {
+         "key": "vllm.cached_tokens",
+         "value": {
+          "intValue": "1408"
+         }
+        },
+        {
+         "key": "llm.request.tool_count",
+         "value": {
+          "intValue": "5"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "Qwen/Qwen3-8B"
+         }
+        },
+        {
+         "key": "vllm.tokens_per_second",
+         "value": {
+          "doubleValue": 16.408336483425074
+         }
+        },
+        {
+         "key": "vllm.mean_itl_ms",
+         "value": {
+          "doubleValue": 60.53840968571811
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "vllm"
+         }
+        },
+        {
+         "key": "gen_ai.request.temperature",
+         "value": {
+          "doubleValue": 0.0
+         }
+        },
+        {
+         "key": "vllm.time_to_first_token_ms",
+         "value": {
+          "doubleValue": 75.1623500000278
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "tool_calls"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "Qwen/Qwen3-8B"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "36"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "1489"
+         }
+        },
+        {
+         "key": "vllm.generation_time_ms",
+         "value": {
+          "doubleValue": 2118.844339000134
+         }
+        },
+        {
+         "key": "llm.time_to_first_token_ms",
+         "value": {
+          "doubleValue": 569.3557050001345
+         }
+        },
+        {
+         "key": "vllm.queue_time_ms",
+         "value": {
+          "doubleValue": 0.01982100002351217
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "7729cfb1c7459207",
+       "parentSpanId": "6f24e06e881ce00f",
+       "name": "BedrockAgentCore.CreateEvent",
+       "kind": 3,
+       "startTimeUnixNano": "1794225786606890961",
+       "endTimeUnixNano": "1794225786694294375",
+       "attributes": [
+        {
+         "key": "rpc.method",
+         "value": {
+          "stringValue": "CreateEvent"
+         }
+        },
+        {
+         "key": "botocore.retry_attempts",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "rpc.system.name",
+         "value": {
+          "stringValue": "aws-api"
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "0af4c118e0f6374d",
+       "parentSpanId": "6f24e06e881ce00f",
+       "name": "execute_tool retrieve_documents",
+       "kind": 1,
+       "startTimeUnixNano": "1794225786694442436",
+       "endTimeUnixNano": "1794225787506499256",
+       "attributes": [
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "chatcmpl-tool-b61e15ab0ad55412"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "retrieve_documents"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "function"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "agent"
+         }
+        },
+        {
+         "key": "mcp.protocol.version",
+         "value": {
+          "stringValue": "2026-07-28"
+         }
+        },
+        {
+         "key": "mcp.method.name",
+         "value": {
+          "stringValue": "tools/call"
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "b6186f558e707dcb",
+       "parentSpanId": "0af4c118e0f6374d",
+       "name": "MCP send tools/call retrieve_documents",
+       "kind": 3,
+       "startTimeUnixNano": "1794225786695108016",
+       "endTimeUnixNano": "1794225787505891835",
+       "attributes": [
+        {
+         "key": "mcp.method.name",
+         "value": {
+          "stringValue": "tools/call"
+         }
+        },
+        {
+         "key": "jsonrpc.request.id",
+         "value": {
+          "stringValue": "3"
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "f458c25d2c786541",
+       "parentSpanId": "6f24e06e881ce00f",
+       "name": "BedrockAgentCore.CreateEvent",
+       "kind": 3,
+       "startTimeUnixNano": "1794225787506676316",
+       "endTimeUnixNano": "1794225787593670031",
+       "attributes": [
+        {
+         "key": "rpc.method",
+         "value": {
+          "stringValue": "CreateEvent"
+         }
+        },
+        {
+         "key": "botocore.retry_attempts",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "rpc.system.name",
+         "value": {
+          "stringValue": "aws-api"
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "f69dcb542854ce92",
+       "parentSpanId": "6f24e06e881ce00f",
+       "name": "chat Qwen/Qwen3-8B",
+       "kind": 3,
+       "startTimeUnixNano": "1794225787593768951",
+       "endTimeUnixNano": "1794225799553441796",
+       "attributes": [
+        {
+         "key": "vllm.cached_tokens",
+         "value": {
+          "intValue": "1472"
+         }
+        },
+        {
+         "key": "llm.request.tool_count",
+         "value": {
+          "intValue": "5"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "Qwen/Qwen3-8B"
+         }
+        },
+        {
+         "key": "vllm.tokens_per_second",
+         "value": {
+          "doubleValue": 16.4028606911746
+         }
+        },
+        {
+         "key": "vllm.mean_itl_ms",
+         "value": {
+          "doubleValue": 60.79365998974446
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "vllm"
+         }
+        },
+        {
+         "key": "gen_ai.request.temperature",
+         "value": {
+          "doubleValue": 0.0
+         }
+        },
+        {
+         "key": "vllm.time_to_first_token_ms",
+         "value": {
+          "doubleValue": 94.3714979998731
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "stop"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "Qwen/Qwen3-8B"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "196"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "1728"
+         }
+        },
+        {
+         "key": "vllm.generation_time_ms",
+         "value": {
+          "doubleValue": 11854.76369800017
+         }
+        },
+        {
+         "key": "llm.time_to_first_token_ms",
+         "value": {
+          "doubleValue": 105.49381800001356
+         }
+        },
+        {
+         "key": "vllm.queue_time_ms",
+         "value": {
+          "doubleValue": 0.012169999990874203
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "5cb0a71405079110",
+       "parentSpanId": "6f24e06e881ce00f",
+       "name": "BedrockAgentCore.CreateEvent",
+       "kind": 3,
+       "startTimeUnixNano": "1794225799553545658",
+       "endTimeUnixNano": "1794225799645609702",
+       "attributes": [
+        {
+         "key": "rpc.method",
+         "value": {
+          "stringValue": "CreateEvent"
+         }
+        },
+        {
+         "key": "botocore.retry_attempts",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "rpc.system.name",
+         "value": {
+          "stringValue": "aws-api"
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      }
+     ]
+    }
+   ]
   },
   {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "6f24e06e881ce00f",
-   "parent_span_id": "ee2ac78e4f97f827",
-   "name": "invoke_agent agent",
-   "kind": "INTERNAL",
-   "start_time_unix_nano": 1794225784307952260,
-   "end_time_unix_nano": 1794225799645634586,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "gen_ai.operation.name": "invoke_agent",
-    "gen_ai.agent.name": "agent",
-    "gen_ai.conversation.id": "34fd17a1-1b50-40ea-b691-57124c16164e",
-    "agent.time_to_first_text_ms": 3391.3192320001144
-   },
    "resource": {
-    "service.name": "agent",
-    "scenario.pitfalls": "none"
-   }
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "vllm"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "84591eae8f9aaa50",
+       "parentSpanId": "cc57475e18c14327",
+       "name": "llm_request",
+       "kind": 2,
+       "startTimeUnixNano": "1794225784405681664",
+       "endTimeUnixNano": "1794225786605598383",
+       "attributes": [
+        {
+         "key": "gen_ai.request.n",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "gen_ai.usage.prompt_tokens",
+         "value": {
+          "intValue": "1489"
+         }
+        },
+        {
+         "key": "gen_ai.usage.completion_tokens",
+         "value": {
+          "intValue": "36"
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_in_model_inference",
+         "value": {
+          "doubleValue": 2.1940066890001617
+         }
+        },
+        {
+         "key": "gen_ai.request.max_tokens",
+         "value": {
+          "intValue": "14895"
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_in_model_prefill",
+         "value": {
+          "doubleValue": 0.0751623500000278
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_in_model_decode",
+         "value": {
+          "doubleValue": 2.118844339000134
+         }
+        },
+        {
+         "key": "gen_ai.latency.e2e",
+         "value": {
+          "doubleValue": 2.199636697769165
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_in_queue",
+         "value": {
+          "doubleValue": 1.982100002351217e-05
+         }
+        },
+        {
+         "key": "gen_ai.request.id",
+         "value": {
+          "stringValue": "chatcmpl-93d5ab7fdf372434"
+         }
+        },
+        {
+         "key": "gen_ai.request.top_p",
+         "value": {
+          "doubleValue": 1.0
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_to_first_token",
+         "value": {
+          "doubleValue": 0.08076286315917969
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "5b13a18a47a6a774",
+       "parentSpanId": "f69dcb542854ce92",
+       "name": "llm_request",
+       "kind": 2,
+       "startTimeUnixNano": "1794225787597669120",
+       "endTimeUnixNano": "1794225799552350335",
+       "attributes": [
+        {
+         "key": "gen_ai.request.n",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "gen_ai.usage.prompt_tokens",
+         "value": {
+          "intValue": "1728"
+         }
+        },
+        {
+         "key": "gen_ai.usage.completion_tokens",
+         "value": {
+          "intValue": "196"
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_in_model_inference",
+         "value": {
+          "doubleValue": 11.949135196000043
+         }
+        },
+        {
+         "key": "gen_ai.request.max_tokens",
+         "value": {
+          "intValue": "14656"
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_in_model_prefill",
+         "value": {
+          "doubleValue": 0.0943714979998731
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_in_model_decode",
+         "value": {
+          "doubleValue": 11.85476369800017
+         }
+        },
+        {
+         "key": "gen_ai.latency.e2e",
+         "value": {
+          "doubleValue": 11.954464435577393
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_in_queue",
+         "value": {
+          "doubleValue": 1.2169999990874203e-05
+         }
+        },
+        {
+         "key": "gen_ai.request.id",
+         "value": {
+          "stringValue": "chatcmpl-8f188045da15f46e"
+         }
+        },
+        {
+         "key": "gen_ai.request.top_p",
+         "value": {
+          "doubleValue": 1.0
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_to_first_token",
+         "value": {
+          "doubleValue": 0.09974050521850586
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      }
+     ]
+    }
+   ]
   },
   {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "d80715717e3ca3d7",
-   "parent_span_id": "6f24e06e881ce00f",
-   "name": "BedrockAgentCore.CreateEvent",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1794225784308009459,
-   "end_time_unix_nano": 1794225784401658291,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "rpc.method": "CreateEvent",
-    "botocore.retry_attempts": 0,
-    "rpc.system.name": "aws-api"
-   },
    "resource": {
-    "service.name": "agent",
-    "scenario.pitfalls": "none"
-   }
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "agent_latency_tracer_mcp_server.DEFAULT"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "6ce3b26318b5a56a",
+       "parentSpanId": "b6186f558e707dcb",
+       "name": "AgentCore.Runtime.Invoke",
+       "kind": 2,
+       "startTimeUnixNano": "1794225786738000000",
+       "endTimeUnixNano": "1794225787487000000",
+       "attributes": [
+        {
+         "key": "latency_ms",
+         "value": {
+          "intValue": "718"
+         }
+        },
+        {
+         "key": "http.status_code",
+         "value": {
+          "intValue": "200"
+         }
+        },
+        {
+         "key": "aws.operation.name",
+         "value": {
+          "stringValue": "InvokeAgentRuntime"
+         }
+        },
+        {
+         "key": "http.method",
+         "value": {
+          "stringValue": "POST"
+         }
+        },
+        {
+         "key": "http.response.status_code",
+         "value": {
+          "intValue": "200"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "daf027a1-7968-4bbf-b16c-cef78a50c508"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      }
+     ]
+    }
+   ]
   },
   {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "cc57475e18c14327",
-   "parent_span_id": "6f24e06e881ce00f",
-   "name": "chat Qwen/Qwen3-8B",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1794225784401750948,
-   "end_time_unix_nano": 1794225786606788080,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "vllm.cached_tokens": 1408,
-    "llm.request.tool_count": 5,
-    "gen_ai.response.model": "Qwen/Qwen3-8B",
-    "vllm.tokens_per_second": 16.408336483425074,
-    "vllm.mean_itl_ms": 60.53840968571811,
-    "gen_ai.provider.name": "vllm",
-    "gen_ai.request.temperature": 0.0,
-    "vllm.time_to_first_token_ms": 75.1623500000278,
-    "gen_ai.response.finish_reasons": [
-     "tool_calls"
-    ],
-    "gen_ai.request.model": "Qwen/Qwen3-8B",
-    "gen_ai.usage.output_tokens": 36,
-    "gen_ai.operation.name": "chat",
-    "gen_ai.usage.input_tokens": 1489,
-    "vllm.generation_time_ms": 2118.844339000134,
-    "llm.time_to_first_token_ms": 569.3557050001345,
-    "vllm.queue_time_ms": 0.01982100002351217
-   },
    "resource": {
-    "service.name": "agent",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "84591eae8f9aaa50",
-   "parent_span_id": "cc57475e18c14327",
-   "name": "llm_request",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1794225784405681664,
-   "end_time_unix_nano": 1794225786605598383,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "gen_ai.request.n": 1,
-    "gen_ai.usage.prompt_tokens": 1489,
-    "gen_ai.usage.completion_tokens": 36,
-    "gen_ai.latency.time_in_model_inference": 2.1940066890001617,
-    "gen_ai.request.max_tokens": 14895,
-    "gen_ai.latency.time_in_model_prefill": 0.0751623500000278,
-    "gen_ai.latency.time_in_model_decode": 2.118844339000134,
-    "gen_ai.latency.e2e": 2.199636697769165,
-    "gen_ai.latency.time_in_queue": 1.982100002351217e-05,
-    "gen_ai.request.id": "chatcmpl-93d5ab7fdf372434",
-    "gen_ai.request.top_p": 1.0,
-    "gen_ai.latency.time_to_first_token": 0.08076286315917969
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "mcp-server"
+      }
+     },
+     {
+      "key": "scenario.pitfalls",
+      "value": {
+       "stringValue": "none"
+      }
+     }
+    ]
    },
-   "resource": {
-    "service.name": "vllm"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "7729cfb1c7459207",
-   "parent_span_id": "6f24e06e881ce00f",
-   "name": "BedrockAgentCore.CreateEvent",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1794225786606890961,
-   "end_time_unix_nano": 1794225786694294375,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "rpc.method": "CreateEvent",
-    "botocore.retry_attempts": 0,
-    "rpc.system.name": "aws-api"
-   },
-   "resource": {
-    "service.name": "agent",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "0af4c118e0f6374d",
-   "parent_span_id": "6f24e06e881ce00f",
-   "name": "execute_tool retrieve_documents",
-   "kind": "INTERNAL",
-   "start_time_unix_nano": 1794225786694442436,
-   "end_time_unix_nano": 1794225787506499256,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "gen_ai.tool.call.id": "chatcmpl-tool-b61e15ab0ad55412",
-    "gen_ai.operation.name": "execute_tool",
-    "gen_ai.tool.name": "retrieve_documents",
-    "gen_ai.tool.type": "function",
-    "gen_ai.agent.name": "agent",
-    "mcp.protocol.version": "2026-07-28",
-    "mcp.method.name": "tools/call"
-   },
-   "resource": {
-    "service.name": "agent",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "b6186f558e707dcb",
-   "parent_span_id": "0af4c118e0f6374d",
-   "name": "MCP send tools/call retrieve_documents",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1794225786695108016,
-   "end_time_unix_nano": 1794225787505891835,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "mcp.method.name": "tools/call",
-    "jsonrpc.request.id": "3"
-   },
-   "resource": {
-    "service.name": "agent",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "6ce3b26318b5a56a",
-   "parent_span_id": "b6186f558e707dcb",
-   "name": "AgentCore.Runtime.Invoke",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1794225786738000000,
-   "end_time_unix_nano": 1794225787487000000,
-   "status_code": "OK",
-   "status_description": null,
-   "attributes": {
-    "latency_ms": 718,
-    "http.status_code": 200,
-    "aws.operation.name": "InvokeAgentRuntime",
-    "http.method": "POST",
-    "http.response.status_code": 200,
-    "session.id": "daf027a1-7968-4bbf-b16c-cef78a50c508"
-   },
-   "resource": {
-    "service.name": "agent_latency_tracer_mcp_server.DEFAULT"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "40fa37c24d5ec43c",
-   "parent_span_id": "6ce3b26318b5a56a",
-   "name": "POST /mcp",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1794225787323397979,
-   "end_time_unix_nano": 1794225787484969584,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "http.target": "/mcp",
-    "http.status_code": 200,
-    "http.method": "POST",
-    "http.response.status_code": 200
-   },
-   "resource": {
-    "service.name": "mcp-server",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "986cb5402f2ad2f9",
-   "parent_span_id": "40fa37c24d5ec43c",
-   "name": "tools/list",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1794225787324599667,
-   "end_time_unix_nano": 1794225787325062633,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "mcp.protocol.version": "2026-07-28",
-    "mcp.method.name": "tools/list",
-    "jsonrpc.request.id": "3"
-   },
-   "resource": {
-    "service.name": "mcp-server",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "c5c6e9bc3dc5f655",
-   "parent_span_id": "b6186f558e707dcb",
-   "name": "tools/call retrieve_documents",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1794225787329574150,
-   "end_time_unix_nano": 1794225787483844365,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "gen_ai.operation.name": "execute_tool",
-    "gen_ai.tool.name": "retrieve_documents",
-    "mcp.protocol.version": "2026-07-28",
-    "mcp.method.name": "tools/call",
-    "jsonrpc.request.id": "3"
-   },
-   "resource": {
-    "service.name": "mcp-server",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "6728f1821b8bb8b8",
-   "parent_span_id": "c5c6e9bc3dc5f655",
-   "name": "embeddings amazon.titan-embed-text-v2:0",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1794225787329766628,
-   "end_time_unix_nano": 1794225787470381777,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "gen_ai.provider.name": "aws.bedrock",
-    "gen_ai.embeddings.dimension.count": 1024,
-    "gen_ai.operation.name": "embeddings",
-    "gen_ai.usage.input_tokens": 15,
-    "gen_ai.request.model": "amazon.titan-embed-text-v2:0",
-    "botocore.retry_attempts": 0
-   },
-   "resource": {
-    "service.name": "mcp-server",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "14c807623165d9d0",
-   "parent_span_id": "c5c6e9bc3dc5f655",
-   "name": "SELECT documents",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1794225787475748300,
-   "end_time_unix_nano": 1794225787482422983,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "db.query.text": "SELECT id, source, text, embedding <-> %(q)s AS distance FROM documents ORDER BY embedding <-> %(q)s LIMIT %(k)s",
-    "db.collection.name": "documents",
-    "db.response.returned_rows": 1,
-    "db.system.name": "postgresql",
-    "db.operation.name": "SELECT"
-   },
-   "resource": {
-    "service.name": "mcp-server",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "f458c25d2c786541",
-   "parent_span_id": "6f24e06e881ce00f",
-   "name": "BedrockAgentCore.CreateEvent",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1794225787506676316,
-   "end_time_unix_nano": 1794225787593670031,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "rpc.method": "CreateEvent",
-    "botocore.retry_attempts": 0,
-    "rpc.system.name": "aws-api"
-   },
-   "resource": {
-    "service.name": "agent",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "f69dcb542854ce92",
-   "parent_span_id": "6f24e06e881ce00f",
-   "name": "chat Qwen/Qwen3-8B",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1794225787593768951,
-   "end_time_unix_nano": 1794225799553441796,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "vllm.cached_tokens": 1472,
-    "llm.request.tool_count": 5,
-    "gen_ai.response.model": "Qwen/Qwen3-8B",
-    "vllm.tokens_per_second": 16.4028606911746,
-    "vllm.mean_itl_ms": 60.79365998974446,
-    "gen_ai.provider.name": "vllm",
-    "gen_ai.request.temperature": 0.0,
-    "vllm.time_to_first_token_ms": 94.3714979998731,
-    "gen_ai.response.finish_reasons": [
-     "stop"
-    ],
-    "gen_ai.request.model": "Qwen/Qwen3-8B",
-    "gen_ai.usage.output_tokens": 196,
-    "gen_ai.operation.name": "chat",
-    "gen_ai.usage.input_tokens": 1728,
-    "vllm.generation_time_ms": 11854.76369800017,
-    "llm.time_to_first_token_ms": 105.49381800001356,
-    "vllm.queue_time_ms": 0.012169999990874203
-   },
-   "resource": {
-    "service.name": "agent",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "5b13a18a47a6a774",
-   "parent_span_id": "f69dcb542854ce92",
-   "name": "llm_request",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1794225787597669120,
-   "end_time_unix_nano": 1794225799552350335,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "gen_ai.request.n": 1,
-    "gen_ai.usage.prompt_tokens": 1728,
-    "gen_ai.usage.completion_tokens": 196,
-    "gen_ai.latency.time_in_model_inference": 11.949135196000043,
-    "gen_ai.request.max_tokens": 14656,
-    "gen_ai.latency.time_in_model_prefill": 0.0943714979998731,
-    "gen_ai.latency.time_in_model_decode": 11.85476369800017,
-    "gen_ai.latency.e2e": 11.954464435577393,
-    "gen_ai.latency.time_in_queue": 1.2169999990874203e-05,
-    "gen_ai.request.id": "chatcmpl-8f188045da15f46e",
-    "gen_ai.request.top_p": 1.0,
-    "gen_ai.latency.time_to_first_token": 0.09974050521850586
-   },
-   "resource": {
-    "service.name": "vllm"
-   }
-  },
-  {
-   "trace_id": "6af1b67700df4971e208a8768cc0e896",
-   "span_id": "5cb0a71405079110",
-   "parent_span_id": "6f24e06e881ce00f",
-   "name": "BedrockAgentCore.CreateEvent",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1794225799553545658,
-   "end_time_unix_nano": 1794225799645609702,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "rpc.method": "CreateEvent",
-    "botocore.retry_attempts": 0,
-    "rpc.system.name": "aws-api"
-   },
-   "resource": {
-    "service.name": "agent",
-    "scenario.pitfalls": "none"
-   }
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "40fa37c24d5ec43c",
+       "parentSpanId": "6ce3b26318b5a56a",
+       "name": "POST /mcp",
+       "kind": 2,
+       "startTimeUnixNano": "1794225787323397979",
+       "endTimeUnixNano": "1794225787484969584",
+       "attributes": [
+        {
+         "key": "http.target",
+         "value": {
+          "stringValue": "/mcp"
+         }
+        },
+        {
+         "key": "http.status_code",
+         "value": {
+          "intValue": "200"
+         }
+        },
+        {
+         "key": "http.method",
+         "value": {
+          "stringValue": "POST"
+         }
+        },
+        {
+         "key": "http.response.status_code",
+         "value": {
+          "intValue": "200"
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "986cb5402f2ad2f9",
+       "parentSpanId": "40fa37c24d5ec43c",
+       "name": "tools/list",
+       "kind": 2,
+       "startTimeUnixNano": "1794225787324599667",
+       "endTimeUnixNano": "1794225787325062633",
+       "attributes": [
+        {
+         "key": "mcp.protocol.version",
+         "value": {
+          "stringValue": "2026-07-28"
+         }
+        },
+        {
+         "key": "mcp.method.name",
+         "value": {
+          "stringValue": "tools/list"
+         }
+        },
+        {
+         "key": "jsonrpc.request.id",
+         "value": {
+          "stringValue": "3"
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "c5c6e9bc3dc5f655",
+       "parentSpanId": "b6186f558e707dcb",
+       "name": "tools/call retrieve_documents",
+       "kind": 2,
+       "startTimeUnixNano": "1794225787329574150",
+       "endTimeUnixNano": "1794225787483844365",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "retrieve_documents"
+         }
+        },
+        {
+         "key": "mcp.protocol.version",
+         "value": {
+          "stringValue": "2026-07-28"
+         }
+        },
+        {
+         "key": "mcp.method.name",
+         "value": {
+          "stringValue": "tools/call"
+         }
+        },
+        {
+         "key": "jsonrpc.request.id",
+         "value": {
+          "stringValue": "3"
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "6728f1821b8bb8b8",
+       "parentSpanId": "c5c6e9bc3dc5f655",
+       "name": "embeddings amazon.titan-embed-text-v2:0",
+       "kind": 3,
+       "startTimeUnixNano": "1794225787329766628",
+       "endTimeUnixNano": "1794225787470381777",
+       "attributes": [
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "aws.bedrock"
+         }
+        },
+        {
+         "key": "gen_ai.embeddings.dimension.count",
+         "value": {
+          "intValue": "1024"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "embeddings"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "15"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "amazon.titan-embed-text-v2:0"
+         }
+        },
+        {
+         "key": "botocore.retry_attempts",
+         "value": {
+          "intValue": "0"
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6af1b67700df4971e208a8768cc0e896",
+       "spanId": "14c807623165d9d0",
+       "parentSpanId": "c5c6e9bc3dc5f655",
+       "name": "SELECT documents",
+       "kind": 3,
+       "startTimeUnixNano": "1794225787475748300",
+       "endTimeUnixNano": "1794225787482422983",
+       "attributes": [
+        {
+         "key": "db.query.text",
+         "value": {
+          "stringValue": "SELECT id, source, text, embedding <-> %(q)s AS distance FROM documents ORDER BY embedding <-> %(q)s LIMIT %(k)s"
+         }
+        },
+        {
+         "key": "db.collection.name",
+         "value": {
+          "stringValue": "documents"
+         }
+        },
+        {
+         "key": "db.response.returned_rows",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "db.system.name",
+         "value": {
+          "stringValue": "postgresql"
+         }
+        },
+        {
+         "key": "db.operation.name",
+         "value": {
+          "stringValue": "SELECT"
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      }
+     ]
+    }
+   ]
   }
  ]
 }

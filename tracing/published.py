@@ -1,8 +1,9 @@
 """Turn a trace into the masked JSON kept under traces/ in the repository.
 
-Spans come from the local SQLite file (exporter.read_trace) or from
-CloudWatch, which returns each span as an OTel JSON document. Both end up in
-the read_trace dict shape, so the waterfall renders either.
+The files are OTLP/JSON, the body an OTLP/HTTP endpoint takes, so Jaeger or
+any other OTLP backend loads them as they are (README). In between, a span is
+a flat dict: from_otel_document reads CloudWatch's documents into it,
+mask_span works on it, and to_otlp / from_otlp convert it to and from the files.
 
 CloudWatch adds attributes of its own, some naming the AWS account (account
 ID, ARNs), the VPC (peer IP) and the endpoint (host, URL). Only the keys
@@ -12,6 +13,7 @@ replaced as well.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -77,3 +79,82 @@ def from_otel_document(doc: dict[str, Any]) -> dict[str, Any]:
         "attributes": doc.get("attributes") or {},
         "resource": (doc.get("resource") or {}).get("attributes") or {},
     }
+
+
+# OTLP's enums, by the names the flat dict uses.
+_KINDS = ["UNSPECIFIED", "INTERNAL", "SERVER", "CLIENT", "PRODUCER", "CONSUMER"]
+_STATUS_CODES = ["UNSET", "OK", "ERROR"]
+
+
+def _any_value(value: Any) -> dict[str, Any]:
+    if isinstance(value, bool):  # before int: bool is an int
+        return {"boolValue": value}
+    if isinstance(value, int):
+        return {"intValue": str(value)}
+    if isinstance(value, float):
+        return {"doubleValue": value}
+    if isinstance(value, list):
+        return {"arrayValue": {"values": [_any_value(v) for v in value]}}
+    return {"stringValue": str(value)}
+
+
+def _from_any_value(value: dict[str, Any]) -> Any:
+    if "intValue" in value:
+        return int(value["intValue"])
+    if "arrayValue" in value:
+        return [_from_any_value(v) for v in value["arrayValue"].get("values", [])]
+    (inner,) = value.values()
+    return inner
+
+
+def _key_values(attributes: dict[str, Any]) -> list[dict[str, Any]]:
+    return [{"key": k, "value": _any_value(v)} for k, v in attributes.items()]
+
+
+def to_otlp(spans: list[dict[str, Any]]) -> dict[str, Any]:
+    """OTLP/JSON for the spans, one resourceSpans entry per distinct resource."""
+    by_resource: dict[str, tuple[dict[str, Any], list[dict[str, Any]]]] = {}
+    for span in spans:
+        key = json.dumps(span["resource"], sort_keys=True)
+        by_resource.setdefault(key, (span["resource"], []))[1].append({
+            "traceId": span["trace_id"],
+            "spanId": span["span_id"],
+            **({"parentSpanId": span["parent_span_id"]} if span["parent_span_id"] else {}),
+            "name": span["name"],
+            "kind": _KINDS.index(span["kind"]),
+            "startTimeUnixNano": str(span["start_time_unix_nano"]),
+            "endTimeUnixNano": str(span["end_time_unix_nano"]),
+            "attributes": _key_values(span["attributes"]),
+            "status": {
+                "code": _STATUS_CODES.index(span["status_code"]),
+                **({"message": span["status_description"]} if span["status_description"] else {}),
+            },
+        })
+    return {"resourceSpans": [
+        {"resource": {"attributes": _key_values(resource)}, "scopeSpans": [{"spans": otlp_spans}]}
+        for resource, otlp_spans in by_resource.values()
+    ]}
+
+
+def from_otlp(doc: dict[str, Any]) -> list[dict[str, Any]]:
+    """The flat dicts for every span in an OTLP/JSON document, by start time."""
+    spans = []
+    for resource_spans in doc["resourceSpans"]:
+        resource = {a["key"]: _from_any_value(a["value"]) for a in resource_spans["resource"].get("attributes", [])}
+        for scope_spans in resource_spans["scopeSpans"]:
+            for span in scope_spans["spans"]:
+                status = span.get("status") or {}
+                spans.append({
+                    "trace_id": span["traceId"],
+                    "span_id": span["spanId"],
+                    "parent_span_id": span.get("parentSpanId") or None,
+                    "name": span["name"],
+                    "kind": _KINDS[span["kind"]],
+                    "start_time_unix_nano": int(span["startTimeUnixNano"]),
+                    "end_time_unix_nano": int(span["endTimeUnixNano"]),
+                    "status_code": _STATUS_CODES[status.get("code", 0)],
+                    "status_description": status.get("message"),
+                    "attributes": {a["key"]: _from_any_value(a["value"]) for a in span.get("attributes", [])},
+                    "resource": resource,
+                })
+    return sorted(spans, key=lambda s: s["start_time_unix_nano"])
