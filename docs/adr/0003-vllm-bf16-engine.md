@@ -1,11 +1,11 @@
-# ADR-0004: 段階5b以降のエンジンは、vLLM 0.31.0とQwen3-8B bf16にする
+# ADR-0003: 段階5b以降のエンジンは、vLLM 0.31.0とQwen3-8B bf16にする
 
 - Status: Accepted
 - Date: 2026-10-31
 
 ## 結論(Summary)
 
-- エンジンはvLLM 0.31.0、モデルはQwen3-8B bf16(GPUはADR-0003のg6.xlarge・L4 1台)。thinkingはオフ。
+- エンジンはvLLM 0.31.0、モデルはQwen3-8B bf16(GPUはADR-0002のg6.xlarge・L4 1台)。thinkingはオフ。
 - 選んだ基準は、エンジンの中で起きる遅れ(事例8/9・10・M1・12)を見る手段があること。
 - リクエストごとの内訳は応答の本文から取り、エンジンのspanは補助にする。
 - エンジンを比べ直すことはしない。

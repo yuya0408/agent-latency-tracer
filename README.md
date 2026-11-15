@@ -198,10 +198,10 @@ AWSでは`infra/`のTerraformで作り、`-var pitfalls=1,2`のように落と�
 | ADR | 決めたこと | 状態 |
 |---|---|---|
 | [0001](docs/adr/0001-agentcore-runtime-placement.md) | MCPサーバとエージェントをAgentCore Runtimeに置き、GPUのサーバとは同居させない | 採用 |
-| [0003](docs/adr/0003-gpu-8b-for-cases.md) | 事例の再現は、GPUで動かす8Bで行う | 採用 |
-| [0004](docs/adr/0004-vllm-bf16-engine.md) | エンジンはvLLM 0.31.0とQwen3-8B bf16にする | 採用 |
+| [0002](docs/adr/0002-gpu-8b-for-cases.md) | 事例の再現は、GPUで動かす8Bで行う | 採用 |
+| [0003](docs/adr/0003-vllm-bf16-engine.md) | エンジンはvLLM 0.31.0とQwen3-8B bf16にする | 採用 |
 
-ほかの決定は、却下した案とともに[設計書](docs/DESIGN.md)の§1にある。0002(業務ツールの作り方)は立てなかったので欠番で、根拠は[業務ツールの調査メモ](docs/tool-catalog-survey.md)にある。
+ほかの決定は、却下した案とともに[設計書](docs/DESIGN.md)の§1にある。
 
 ## ライセンス・出典
 
