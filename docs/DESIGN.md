@@ -21,11 +21,12 @@
 | 遅かった1件の見つけ方 | エージェントが質問ごとにtrace_idと所要時間を構造化ログに出す | 画面のトレースの一覧は索引(1%)に入ったものしか出ないので、「遅かった」と言われた1件はログからtrace_idを引いて開く(§5)。手順書の最初の段にする |
 | トレースの集め先 | CloudWatch(Transaction Search) | AgentCoreの基盤側のspanと同じ場所に集める。実務で標準的なやり方 |
 | Transaction Searchの設定 | `infra/account/`(状態ファイルは別のキー)で有効にし、段階ごとに消す`infra/`とは分けて残す。送り先はCloudWatch Logs、索引は初期値の1% | アカウントとリージョンに1つの設定。Terraformの説明では、送り先と索引のリソースを消してもAWS側の設定は戻らず、X-Rayに書き込みを許すログのリソースポリシーだけが消えて壊れる。spanを送らなければ費用はかからない。索引の割合は1%のまま上げない(§5で決めた) |
-| 手元からCloudWatchへの送信 | ADOTを使わず、OTel標準のOTLP/HTTPの送信部品に、botocoreでSigV4の署名をする`requests`のセッションを渡す(ADOTの`OTLPAwsSpanExporter`と同じ作り)。SQLiteへの保存は残し、CloudWatchは2つ目の送り先にする(`run_agent.py --cloudwatch`) | ADOTはOTelのSDKを1つの版に固定し、約50個の計装を一緒に入れ、TracerProviderを自分で組む前提で、このプロジェクトの`build_tracer_provider`と合わない。段階5のコンテナ(AgentCoreの公式の手順はADOTが前提)でも、ADOTは使わずに同じ送り方にした(§5)。SQLiteを残すのは「手元での開発」と同じ理由 |
-| 手元での開発 | AWS無しでも動く形を残す(検索はfaiss、トレースは自作SQLite＋waterfall) | 開発中の確認と、AWSを使わない読み手のため |
+| 手元からCloudWatchへの送信 | ADOTを使わず、OTel標準のOTLP/HTTPの送信部品に、botocoreでSigV4の署名をする`requests`のセッションを渡す(ADOTの`OTLPAwsSpanExporter`と同じ作り)。手元の送り先(Jaeger)と並べて、CloudWatchを2つ目の送り先にできる(`TRACE_TO=otlp,cloudwatch`) | ADOTはOTelのSDKを1つの版に固定し、約50個の計装を一緒に入れ、TracerProviderを自分で組む前提で、このプロジェクトの`build_tracer_provider`と合わない。段階5のコンテナ(AgentCoreの公式の手順はADOTが前提)でも、ADOTは使わずに同じ送り方にした(§5) |
+| 手元での開発 | AWS無しでも動く形を残す(検索はfaiss、トレースはJaeger) | 開発中の確認と、AWSを使わない読み手のため |
+| トレースの表示 | Jaeger 2.22.0(コンテナ1つ、保存はメモリ)にOTLPで送る。CloudWatchの画面は使えるが、ログインが要るので公開には使わない | 汎用のトレース表示の定番で、OTLPをそのまま受ける。**採らなかった案**: 自作の保存とwaterfall(同じことをする既製品があり、公開用の形式も独自になる)。Grafana Tempo(表示にGrafanaが要り、手元の確認には重い)。Zipkin(OTLPを直接受けない)。Phoenix・Langfuse(LLMの呼び出しの中身を見る道具で、基盤側の時間を追う目的とずれる) |
 | 事例の書き方 | 事例ごとに1ファイル。落とし穴ありと修正済みを並べる | 落とし穴のコードそのものが読めるようにする |
-| 公開する根拠 | トレースをJSONで書き出し、waterfall画像と一緒に`traces/`に置く。アカウントID・ARNは伏せる | 読み手がAWS無しで結果を確かめられるようにする |
-| 手元の実行環境 | WSLのUbuntu。エージェント・テスト・開発中のMCPサーバはWSLのvenv、llama.cppは公式のDockerイメージ。venvと、測定中に書き込むトレースのSQLiteはWSLのホーム側に置く。リポジトリはWindows側のまま、WSLから`/mnt/c`越しに実行する | このPCではスマートアプリコントロールが署名の無いDLL(faiss)を止める。通信がWindowsとWSLをまたがないようそろえる。本番(AgentCore)もLinuxのコンテナ。`/mnt/c`越しのファイルの読み書きは遅いが、コードを読むのは起動時だけなので測定には混ざらない |
+| 公開する根拠 | トレースを標準のOTLP/JSONで書き出し、Jaegerのwaterfallの画像と一緒に`traces/`に置く。アカウントID・ARNは伏せる | 読み手がAWS無しで結果を確かめられ、どのOTLPのバックエンドにも読み込める |
+| 手元の実行環境 | WSLのUbuntu。エージェント・テスト・開発中のMCPサーバはWSLのvenv、llama.cppは公式のDockerイメージ。venvはWSLのホーム側に置く。リポジトリはWindows側のまま、WSLから`/mnt/c`越しに実行する | このPCではスマートアプリコントロールが署名の無いDLL(faiss)を止める。通信がWindowsとWSLをまたがないようそろえる。本番(AgentCore)もLinuxのコンテナ。`/mnt/c`越しのファイルの読み書きは遅いが、コードを読むのは起動時だけなので測定には混ざらない |
 | インフラ | Terraform。使うときに作り、終わったら消す。状態ファイルは既存のS3バケットに別キーで保存 | 費用を抑える。状態ファイルにはアカウントIDやリソースのIDが入るためリポジトリに置かない |
 | 手元からRDSへの接続(作業用) | Session Managerのポート転送。踏み台のEC2(t4g.nano、公開IPなし、受け入れの許可なし)と、SSMのインターフェース型エンドポイント3つ(ssm・ssmmessages・ec2messages)を、1つ目のサブネットに置く。RDSと一緒に作って消す | 表を作る・データを入れる・測るための裏口で、本ランの経路(AgentCore→RDS)には入らない。AWSがRDS向けの手順を公式に出している定番。EC2 Instance Connect Endpointは無料だが、公式の手順はEC2向けだけで、RDSへ直接つなぐ例は第三者のものしかなく、使えるポートの記述も食い違っていたので採らなかった。SSHで入る公開の踏み台は、インターネットゲートウェイが要るので採らない |
 | RDSの設定 | PostgreSQL 18(小さい版の番号は固定しない)、db.t4g.medium(メモリ4GB)、パスワードはRDSに作らせSecrets Managerに置く(`manage_master_user_password`)、踏み台と同じAZ、バックアップなし | 18はRDSの初期設定。小さい版まで固定すると、その版が選べなくなったときに作れなくなるので、代わりに測るときの実際の版を§8に記録する。mediumは、表とHNSWのインデックスがメモリに収まる大きさ(一般的な選び方。収まらないとディスクの遅さが事例5に混ざる)。microでは表だけで`shared_buffers`に収まらなかった。パスワードが状態ファイルに入らない。AZをまたぐ1ms前後の遅れを検索の時間に混ぜない |
@@ -70,9 +71,8 @@ flowchart LR
 | 場所 | 役割 | 状態 |
 |---|---|---|
 | [tracing/instrumentation.py](../tracing/instrumentation.py) | OTel GenAI規約・MCP規約のspan builder、グローバルProviderの登録。保存は`batch=True`で`BatchSpanProcessor`(テストは`SimpleSpanProcessor`)。送り先は複数渡せ、それぞれに別のprocessorを付ける | ✅ |
-| [tracing/exporter.py](../tracing/exporter.py) | spanをSQLiteに保存(手元用) | ✅ |
+| [tracing/exporter.py](../tracing/exporter.py) | spanの送り先(`TRACE_TO`。手元はJaegerへOTLP、AWSはCloudWatch) | ✅ |
 | [tracing/aws_exporter.py](../tracing/aws_exporter.py) | spanをCloudWatch(Transaction Search)に送る。OTLP/HTTPとSigV4(依存は`aws`の組) | ✅ |
-| [tracing/viewer/waterfall.py](../tracing/viewer/waterfall.py) | 単一HTMLのwaterfall(手元用) | ✅ |
 | [tracing/published.py](../tracing/published.py) | `traces/`に置くトレースを伏せる。残す属性のキーを決め、残した値の中のアカウントID・ARNも置き換える | ✅ |
 | [system/tools/](../system/tools/) | 業務ツール4つの定義(`catalog.json`)、データの種類と項目(`data_schema.json`)、合成データ(`mock_data.json`)、モック実行(200〜800ms待ってから、合成データを条件で絞り・集計して返す) | ✅ |
 | [system/retrieval/](../system/retrieval/) | 手元用の検索(faiss)、合成ベクトルの生成 | ✅(合成ベクトルはpgvectorへの投入にも使う) |
@@ -80,8 +80,8 @@ flowchart LR
 | [system/pitfalls.py](../system/pitfalls.py) | 環境変数`PITFALLS`で入れる落とし穴を読み、resource属性`scenario.pitfalls`に記録する | ✅ |
 | [system/mcp_server/](../system/mcp_server/) | 自作MCPサーバ(低レベルAPI、Streamable HTTP、`/mcp`、ステートレス)。業務ツール＋文書検索`retrieve_documents`(faissかpgvector。pgvectorでは質問をTitan Text Embeddings V2で埋め込み、本文つきで上位10件(上限20)を返す。RDSにはIAMのトークンでログインし、接続プールは最初の`tools/list`で開く)。AgentCore用のコンテナは`Dockerfile`。計装オンのときはHTTPリクエストごとのspan(`opentelemetry-instrumentation-asgi`)も出す。`MCP_SERVER_OTEL=0`で計装オフ | ✅ |
 | [system/mcp_client.py](../system/mcp_client.py) | SDKの`Client`を包み、tool呼び出しを`execute_tool` spanで囲む。HTTPヘッダにも`traceparent`を載せる(`httpx2`の`event_hooks`)。AgentCoreのURLならSigV4で署名し、`Mcp-Session-Id`を送り返す(§7の12)。`async with`の間は接続を使い回す | ✅ |
-| [scripts/try_mcp.py](../scripts/try_mcp.py) | 手元の動作確認。ツール3つを「1つずつ」と「同時に」で呼び、waterfallを`out/`に出す | ✅ |
-| [scripts/run_agent.py](../scripts/run_agent.py) | 手元の動作確認。仮の質問(§6の3)をエージェントに流し、質問ごとのwaterfallを`out/`に出す | ✅ |
+| [scripts/try_mcp.py](../scripts/try_mcp.py) | 手元の動作確認。ツール3つを「1つずつ」と「同時に」で呼び、JaegerのURLを出す | ✅ |
+| [scripts/run_agent.py](../scripts/run_agent.py) | 手元の動作確認。仮の質問(§6の3)をエージェントに流し、質問ごとにJaegerのURLを出す | ✅ |
 | [scripts/gpu_prepare.sh](../scripts/gpu_prepare.sh)・[infra/gpu_prepare/](../infra/gpu_prepare/) | 仮のGPUサーバと、その中で動かす手順。イメージと重みを移し、本番と同じ経路で1回試す。ふだんは作らない。NVMeを使う形に直した後は動かしていない | ✅ |
 | [infra/gpu.tf](../infra/gpu.tf)・[infra/gpu_boot.sh.tftpl](../infra/gpu_boot.sh.tftpl) | VPCの中のGPUサーバ(vLLM＋Collector)と、起動手順。`terraform apply -target=aws_instance.gpu`で、要るエンドポイントごと作る | ✅ |
 | [system/serving/otel-collector.yaml](../system/serving/otel-collector.yaml) | Collectorの設定(§1) | ✅ |
@@ -92,7 +92,7 @@ flowchart LR
 | [scripts/invoke_agent.py](../scripts/invoke_agent.py) | 利用者役。Runtime上のエージェントに仮の質問を`InvokeAgentRuntime`で投げ、自分のspanの`traceparent`を付ける。既定は回の初めにセッションを温めて使い回す(`--cold`で質問ごとに新しいセッション)、`--concurrent`で同時に投げる、`--cut-after`で切って`StopRuntimeSession`で止める | ✅ |
 | [infra/](../infra/) | Terraform(VPC・RDS・踏み台・AgentCore Runtime・基盤側のspanの配送)。AgentCore Memory、VPCエンドポイント。`infra/account/`はTransaction Search。`infra/artifacts/`はイメージ(ECR。vLLM・Collector・MCPサーバ・エージェント)と重み(S3)の置き場で、段階ごとに消さない | ✅ |
 | [scripts/build_corpus.py](../scripts/build_corpus.py)・[embed_corpus.py](../scripts/embed_corpus.py)・[load_pgvector.py](../scripts/load_pgvector.py)・[measure_pgvector.py](../scripts/measure_pgvector.py) | 文書を条ごとに切る(`data/corpus/`)→ Titanで埋め込む → RDSに入れる。事例5の測定(HNSWなし/あり) | ✅ |
-| [scripts/export_trace.py](../scripts/export_trace.py) | トレースを手元のSQLiteかCloudWatchから読み、伏せたJSONとwaterfallのHTMLを`traces/`に書き出す | ✅ |
+| [scripts/export_trace.py](../scripts/export_trace.py) | トレースをCloudWatchから読み、伏せたOTLP/JSONを`traces/`に書き出す | ✅ |
 | [scripts/collect_gpu.sh](../scripts/collect_gpu.sh) | destroyの前に、GPUサーバのログ・vLLMの`/metrics`・5秒ごとの記録を手元に回収する | ✅ |
 | [scripts/plot_breakdown.py](../scripts/plot_breakdown.py)・[plot_cut.py](../scripts/plot_cut.py) | READMEの図(1問の内訳、切断の止め方) | ✅ |
 | [tests/](../tests/)・[.github/workflows/test.yml](../.github/workflows/test.yml) | テスト(偽のLLM・偽のAWS・プロセス内のMCP。pgvectorはCIの中で立てたPostgreSQL)。PRとmainへのpushで回す | ✅ |
@@ -161,7 +161,7 @@ flowchart LR
   `logs:PutResourcePolicy`は戻していない。ADOTは使わず、`DISABLE_ADOT_OBSERVABILITY=true`でRuntimeが入れる`OTEL_*`の
   環境変数を消した(標準のOTLPエクスポーターがヘッダなどを環境変数からも読むため)
 - **AWSの画面でトレースを見る方法**(2026-10-31に解決): 索引の割合は1%のまま、トレースIDをX-Ray形式にして、画面の
-  waterfallで見る。事例の記録に載せるトレースは、`StartTraceRetrieval`で取り出して自作のwaterfallで書き出す(段階6の前に作る)
+  waterfallで見る。事例の記録に載せるトレースは、`StartTraceRetrieval`で取り出してOTLP/JSONで`traces/`に置く
   - トレースの一覧と`batch-get-traces`は、索引(トレースの要約)に入ったトレースだけを返す。索引はトレースIDごとに確率で選ばれる
     (初期値1%)ので、手元から流す少ないトレースはまず入らない(2026-10-27に0件)。基盤のヘルスチェックと思われる2spanの
     トレースが約2秒おきに入っていたが、確率で選ぶので、自分のトレースの枠を奪うわけではない

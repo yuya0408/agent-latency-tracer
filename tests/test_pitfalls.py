@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import pytest
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from system import pitfalls
-from tracing.exporter import SQLiteSpanExporter, read_trace
 from tracing.instrumentation import build_tracer_provider, get_tracer, invoke_agent_span
 
 
@@ -32,15 +32,15 @@ def test_a_case_not_built_yet_fails(monkeypatch, available):
         pitfalls.enabled()
 
 
-def test_recorded_on_every_span(monkeypatch, available, tmp_path):
+def test_recorded_on_every_span(monkeypatch, available):
     monkeypatch.setenv(pitfalls.ENV_VAR, "3")
-    db_path = tmp_path / "traces.db"
+    exporter = InMemorySpanExporter()
     provider = build_tracer_provider(
-        SQLiteSpanExporter(db_path), service_name="agent", resource_attributes=pitfalls.resource_attributes()
+        exporter, service_name="agent", resource_attributes=pitfalls.resource_attributes()
     )
-    with invoke_agent_span(get_tracer(provider), agent_name="agent") as span:
-        trace_id = f"{span.get_span_context().trace_id:032x}"
+    with invoke_agent_span(get_tracer(provider), agent_name="agent"):
+        pass
     provider.shutdown()
-    (stored,) = read_trace(db_path, trace_id)
-    assert stored["resource"][pitfalls.RESOURCE_ATTRIBUTE] == "3"
-    assert stored["resource"]["service.name"] == "agent"  # not overridden by the extra attributes
+    (stored,) = exporter.get_finished_spans()
+    assert stored.resource.attributes[pitfalls.RESOURCE_ATTRIBUTE] == "3"
+    assert stored.resource.attributes["service.name"] == "agent"  # not overridden by the extra attributes

@@ -1,290 +1,730 @@
 {
- "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
- "spans": [
+ "resourceSpans": [
   {
-   "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
-   "span_id": "4a69082f70392074",
-   "parent_span_id": "a883ad3a2c7555c4",
-   "name": "InvokeAgentRuntime",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1793863915621372559,
-   "end_time_unix_nano": 1793863918196963950,
-   "status_code": "ERROR",
-   "status_description": "RuntimeClientError: An error occurred (RuntimeClientError) when calling the InvokeAgentRuntime operation: Received error (500) from runtime. Please check your CloudWatch logs for more information.",
-   "attributes": {},
    "resource": {
-    "service.name": "caller"
-   }
-  },
-  {
-   "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
-   "span_id": "a883ad3a2c7555c4",
-   "parent_span_id": null,
-   "name": "InternalOperation",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1793863915621372559,
-   "end_time_unix_nano": 1793863918196963950,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {},
-   "resource": {
-    "service.name": "caller"
-   }
-  },
-  {
-   "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
-   "span_id": "014732e1f82aecd4",
-   "parent_span_id": "4a69082f70392074",
-   "name": "AgentCore.Runtime.Invoke",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1793863915692000000,
-   "end_time_unix_nano": 1793863918143000000,
-   "status_code": "ERROR",
-   "status_description": "Received error (500) from runtime. Please check your CloudWatch logs for more information.",
-   "attributes": {
-    "latency_ms": 2430,
-    "http.status_code": 424,
-    "aws.operation.name": "InvokeAgentRuntime",
-    "http.method": "POST",
-    "http.response.status_code": 424,
-    "session.id": "f57817da-2e08-4f64-be9b-a14d696dc283"
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "caller"
+      }
+     }
+    ]
    },
-   "resource": {
-    "service.name": "agent_latency_tracer_agent.DEFAULT"
-   }
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "6aec30ebc13e0bced0ed26d8d54818e8",
+       "spanId": "4a69082f70392074",
+       "parentSpanId": "a883ad3a2c7555c4",
+       "name": "InvokeAgentRuntime",
+       "kind": 3,
+       "startTimeUnixNano": "1793863915621372559",
+       "endTimeUnixNano": "1793863918196963950",
+       "attributes": [],
+       "status": {
+        "code": 2,
+        "message": "RuntimeClientError: An error occurred (RuntimeClientError) when calling the InvokeAgentRuntime operation: Received error (500) from runtime. Please check your CloudWatch logs for more information."
+       }
+      },
+      {
+       "traceId": "6aec30ebc13e0bced0ed26d8d54818e8",
+       "spanId": "a883ad3a2c7555c4",
+       "name": "InternalOperation",
+       "kind": 2,
+       "startTimeUnixNano": "1793863915621372559",
+       "endTimeUnixNano": "1793863918196963950",
+       "attributes": [],
+       "status": {
+        "code": 0
+       }
+      }
+     ]
+    }
+   ]
   },
   {
-   "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
-   "span_id": "3e090a2d9ce846cb",
-   "parent_span_id": "014732e1f82aecd4",
-   "name": "invoke_agent agent",
-   "kind": "INTERNAL",
-   "start_time_unix_nano": 1793863915738077608,
-   "end_time_unix_nano": 1793863918139756140,
-   "status_code": "ERROR",
-   "status_description": "MCPError: Internal server error",
-   "attributes": {
-    "gen_ai.operation.name": "invoke_agent",
-    "gen_ai.agent.name": "agent",
-    "gen_ai.conversation.id": "f57817da-2e08-4f64-be9b-a14d696dc283"
-   },
    "resource": {
-    "service.name": "agent",
-    "scenario.pitfalls": "none"
-   }
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "agent_latency_tracer_agent.DEFAULT"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "6aec30ebc13e0bced0ed26d8d54818e8",
+       "spanId": "014732e1f82aecd4",
+       "parentSpanId": "4a69082f70392074",
+       "name": "AgentCore.Runtime.Invoke",
+       "kind": 2,
+       "startTimeUnixNano": "1793863915692000000",
+       "endTimeUnixNano": "1793863918143000000",
+       "attributes": [
+        {
+         "key": "latency_ms",
+         "value": {
+          "intValue": "2430"
+         }
+        },
+        {
+         "key": "http.status_code",
+         "value": {
+          "intValue": "424"
+         }
+        },
+        {
+         "key": "aws.operation.name",
+         "value": {
+          "stringValue": "InvokeAgentRuntime"
+         }
+        },
+        {
+         "key": "http.method",
+         "value": {
+          "stringValue": "POST"
+         }
+        },
+        {
+         "key": "http.response.status_code",
+         "value": {
+          "intValue": "424"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "f57817da-2e08-4f64-be9b-a14d696dc283"
+         }
+        }
+       ],
+       "status": {
+        "code": 2,
+        "message": "Received error (500) from runtime. Please check your CloudWatch logs for more information."
+       }
+      }
+     ]
+    }
+   ]
   },
   {
-   "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
-   "span_id": "32b09a30c839e97d",
-   "parent_span_id": "3e090a2d9ce846cb",
-   "name": "chat Qwen/Qwen3-8B",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1793863915738132854,
-   "end_time_unix_nano": 1793863917938422475,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "vllm.cached_tokens": 1280,
-    "gen_ai.response.model": "Qwen/Qwen3-8B",
-    "vllm.tokens_per_second": 16.435085042128808,
-    "vllm.mean_itl_ms": 60.54176497142894,
-    "gen_ai.provider.name": "vllm",
-    "gen_ai.request.temperature": 0.0,
-    "vllm.time_to_first_token_ms": 71.47410799996123,
-    "gen_ai.response.finish_reasons": [
-     "tool_calls"
-    ],
-    "gen_ai.request.model": "Qwen/Qwen3-8B",
-    "gen_ai.usage.output_tokens": 36,
-    "gen_ai.operation.name": "chat",
-    "gen_ai.usage.input_tokens": 1316,
-    "vllm.generation_time_ms": 2118.961774000013,
-    "llm.time_to_first_token_ms": 564.7973060000027,
-    "vllm.queue_time_ms": 0.009381000040775689
-   },
    "resource": {
-    "service.name": "agent",
-    "scenario.pitfalls": "none"
-   }
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "agent"
+      }
+     },
+     {
+      "key": "scenario.pitfalls",
+      "value": {
+       "stringValue": "none"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "6aec30ebc13e0bced0ed26d8d54818e8",
+       "spanId": "3e090a2d9ce846cb",
+       "parentSpanId": "014732e1f82aecd4",
+       "name": "invoke_agent agent",
+       "kind": 1,
+       "startTimeUnixNano": "1793863915738077608",
+       "endTimeUnixNano": "1793863918139756140",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "agent"
+         }
+        },
+        {
+         "key": "gen_ai.conversation.id",
+         "value": {
+          "stringValue": "f57817da-2e08-4f64-be9b-a14d696dc283"
+         }
+        }
+       ],
+       "status": {
+        "code": 2,
+        "message": "MCPError: Internal server error"
+       }
+      },
+      {
+       "traceId": "6aec30ebc13e0bced0ed26d8d54818e8",
+       "spanId": "32b09a30c839e97d",
+       "parentSpanId": "3e090a2d9ce846cb",
+       "name": "chat Qwen/Qwen3-8B",
+       "kind": 3,
+       "startTimeUnixNano": "1793863915738132854",
+       "endTimeUnixNano": "1793863917938422475",
+       "attributes": [
+        {
+         "key": "vllm.cached_tokens",
+         "value": {
+          "intValue": "1280"
+         }
+        },
+        {
+         "key": "gen_ai.response.model",
+         "value": {
+          "stringValue": "Qwen/Qwen3-8B"
+         }
+        },
+        {
+         "key": "vllm.tokens_per_second",
+         "value": {
+          "doubleValue": 16.435085042128808
+         }
+        },
+        {
+         "key": "vllm.mean_itl_ms",
+         "value": {
+          "doubleValue": 60.54176497142894
+         }
+        },
+        {
+         "key": "gen_ai.provider.name",
+         "value": {
+          "stringValue": "vllm"
+         }
+        },
+        {
+         "key": "gen_ai.request.temperature",
+         "value": {
+          "doubleValue": 0.0
+         }
+        },
+        {
+         "key": "vllm.time_to_first_token_ms",
+         "value": {
+          "doubleValue": 71.47410799996123
+         }
+        },
+        {
+         "key": "gen_ai.response.finish_reasons",
+         "value": {
+          "arrayValue": {
+           "values": [
+            {
+             "stringValue": "tool_calls"
+            }
+           ]
+          }
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "Qwen/Qwen3-8B"
+         }
+        },
+        {
+         "key": "gen_ai.usage.output_tokens",
+         "value": {
+          "intValue": "36"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.usage.input_tokens",
+         "value": {
+          "intValue": "1316"
+         }
+        },
+        {
+         "key": "vllm.generation_time_ms",
+         "value": {
+          "doubleValue": 2118.961774000013
+         }
+        },
+        {
+         "key": "llm.time_to_first_token_ms",
+         "value": {
+          "doubleValue": 564.7973060000027
+         }
+        },
+        {
+         "key": "vllm.queue_time_ms",
+         "value": {
+          "doubleValue": 0.009381000040775689
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6aec30ebc13e0bced0ed26d8d54818e8",
+       "spanId": "fd17edf7f80c02ef",
+       "parentSpanId": "3e090a2d9ce846cb",
+       "name": "execute_tool retrieve_documents",
+       "kind": 1,
+       "startTimeUnixNano": "1793863917938622840",
+       "endTimeUnixNano": "1793863918138181949",
+       "attributes": [
+        {
+         "key": "gen_ai.tool.call.id",
+         "value": {
+          "stringValue": "chatcmpl-tool-a80303248d9bbae1"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "retrieve_documents"
+         }
+        },
+        {
+         "key": "gen_ai.tool.type",
+         "value": {
+          "stringValue": "function"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "agent"
+         }
+        },
+        {
+         "key": "mcp.protocol.version",
+         "value": {
+          "stringValue": "2026-07-28"
+         }
+        },
+        {
+         "key": "mcp.method.name",
+         "value": {
+          "stringValue": "tools/call"
+         }
+        }
+       ],
+       "status": {
+        "code": 2,
+        "message": "MCPError: Internal server error"
+       }
+      },
+      {
+       "traceId": "6aec30ebc13e0bced0ed26d8d54818e8",
+       "spanId": "d86e92d54fd7b657",
+       "parentSpanId": "fd17edf7f80c02ef",
+       "name": "MCP send tools/call retrieve_documents",
+       "kind": 3,
+       "startTimeUnixNano": "1793863917938808226",
+       "endTimeUnixNano": "1793863918135576062",
+       "attributes": [
+        {
+         "key": "error.type",
+         "value": {
+          "stringValue": "-32603"
+         }
+        },
+        {
+         "key": "mcp.method.name",
+         "value": {
+          "stringValue": "tools/call"
+         }
+        },
+        {
+         "key": "jsonrpc.request.id",
+         "value": {
+          "stringValue": "14"
+         }
+        }
+       ],
+       "status": {
+        "code": 2,
+        "message": "Internal server error"
+       }
+      }
+     ]
+    }
+   ]
   },
   {
-   "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
-   "span_id": "24601dda1ac297c1",
-   "parent_span_id": "32b09a30c839e97d",
-   "name": "llm_request",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1793863915741555456,
-   "end_time_unix_nano": 1793863917937215906,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "gen_ai.request.n": 1,
-    "gen_ai.usage.prompt_tokens": 1316,
-    "gen_ai.usage.completion_tokens": 36,
-    "gen_ai.latency.time_in_model_inference": 2.1904358819999743,
-    "gen_ai.request.max_tokens": 15068,
-    "gen_ai.latency.time_in_model_prefill": 0.07147410799996123,
-    "gen_ai.latency.time_in_model_decode": 2.118961774000013,
-    "gen_ai.latency.e2e": 2.1953964233398438,
-    "gen_ai.latency.time_in_queue": 9.381000040775689e-06,
-    "gen_ai.request.id": "chatcmpl-9dae80cb47520032",
-    "gen_ai.request.top_p": 1.0,
-    "gen_ai.latency.time_to_first_token": 0.07600903511047363
-   },
    "resource": {
-    "service.name": "vllm"
-   }
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "vllm"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "6aec30ebc13e0bced0ed26d8d54818e8",
+       "spanId": "24601dda1ac297c1",
+       "parentSpanId": "32b09a30c839e97d",
+       "name": "llm_request",
+       "kind": 2,
+       "startTimeUnixNano": "1793863915741555456",
+       "endTimeUnixNano": "1793863917937215906",
+       "attributes": [
+        {
+         "key": "gen_ai.request.n",
+         "value": {
+          "intValue": "1"
+         }
+        },
+        {
+         "key": "gen_ai.usage.prompt_tokens",
+         "value": {
+          "intValue": "1316"
+         }
+        },
+        {
+         "key": "gen_ai.usage.completion_tokens",
+         "value": {
+          "intValue": "36"
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_in_model_inference",
+         "value": {
+          "doubleValue": 2.1904358819999743
+         }
+        },
+        {
+         "key": "gen_ai.request.max_tokens",
+         "value": {
+          "intValue": "15068"
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_in_model_prefill",
+         "value": {
+          "doubleValue": 0.07147410799996123
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_in_model_decode",
+         "value": {
+          "doubleValue": 2.118961774000013
+         }
+        },
+        {
+         "key": "gen_ai.latency.e2e",
+         "value": {
+          "doubleValue": 2.1953964233398438
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_in_queue",
+         "value": {
+          "doubleValue": 9.381000040775689e-06
+         }
+        },
+        {
+         "key": "gen_ai.request.id",
+         "value": {
+          "stringValue": "chatcmpl-9dae80cb47520032"
+         }
+        },
+        {
+         "key": "gen_ai.request.top_p",
+         "value": {
+          "doubleValue": 1.0
+         }
+        },
+        {
+         "key": "gen_ai.latency.time_to_first_token",
+         "value": {
+          "doubleValue": 0.07600903511047363
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      }
+     ]
+    }
+   ]
   },
   {
-   "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
-   "span_id": "fd17edf7f80c02ef",
-   "parent_span_id": "3e090a2d9ce846cb",
-   "name": "execute_tool retrieve_documents",
-   "kind": "INTERNAL",
-   "start_time_unix_nano": 1793863917938622840,
-   "end_time_unix_nano": 1793863918138181949,
-   "status_code": "ERROR",
-   "status_description": "MCPError: Internal server error",
-   "attributes": {
-    "gen_ai.tool.call.id": "chatcmpl-tool-a80303248d9bbae1",
-    "gen_ai.operation.name": "execute_tool",
-    "gen_ai.tool.name": "retrieve_documents",
-    "gen_ai.tool.type": "function",
-    "gen_ai.agent.name": "agent",
-    "mcp.protocol.version": "2026-07-28",
-    "mcp.method.name": "tools/call"
-   },
    "resource": {
-    "service.name": "agent",
-    "scenario.pitfalls": "none"
-   }
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "agent_latency_tracer_mcp_server.DEFAULT"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "6aec30ebc13e0bced0ed26d8d54818e8",
+       "spanId": "42d11c8f07214764",
+       "parentSpanId": "d86e92d54fd7b657",
+       "name": "AgentCore.Runtime.Invoke",
+       "kind": 2,
+       "startTimeUnixNano": "1793863917987000000",
+       "endTimeUnixNano": "1793863918116000000",
+       "attributes": [
+        {
+         "key": "latency_ms",
+         "value": {
+          "intValue": "97"
+         }
+        },
+        {
+         "key": "http.status_code",
+         "value": {
+          "intValue": "200"
+         }
+        },
+        {
+         "key": "aws.operation.name",
+         "value": {
+          "stringValue": "InvokeAgentRuntime"
+         }
+        },
+        {
+         "key": "http.method",
+         "value": {
+          "stringValue": "POST"
+         }
+        },
+        {
+         "key": "http.response.status_code",
+         "value": {
+          "intValue": "200"
+         }
+        },
+        {
+         "key": "session.id",
+         "value": {
+          "stringValue": "742d52ba-35d6-4b23-bf34-8c7153b63960"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      }
+     ]
+    }
+   ]
   },
   {
-   "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
-   "span_id": "d86e92d54fd7b657",
-   "parent_span_id": "fd17edf7f80c02ef",
-   "name": "MCP send tools/call retrieve_documents",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1793863917938808226,
-   "end_time_unix_nano": 1793863918135576062,
-   "status_code": "ERROR",
-   "status_description": "Internal server error",
-   "attributes": {
-    "error.type": "-32603",
-    "mcp.method.name": "tools/call",
-    "jsonrpc.request.id": "14"
-   },
    "resource": {
-    "service.name": "agent",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
-   "span_id": "42d11c8f07214764",
-   "parent_span_id": "d86e92d54fd7b657",
-   "name": "AgentCore.Runtime.Invoke",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1793863917987000000,
-   "end_time_unix_nano": 1793863918116000000,
-   "status_code": "OK",
-   "status_description": null,
-   "attributes": {
-    "latency_ms": 97,
-    "http.status_code": 200,
-    "aws.operation.name": "InvokeAgentRuntime",
-    "http.method": "POST",
-    "http.response.status_code": 200,
-    "session.id": "742d52ba-35d6-4b23-bf34-8c7153b63960"
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "mcp-server"
+      }
+     },
+     {
+      "key": "scenario.pitfalls",
+      "value": {
+       "stringValue": "none"
+      }
+     }
+    ]
    },
-   "resource": {
-    "service.name": "agent_latency_tracer_mcp_server.DEFAULT"
-   }
-  },
-  {
-   "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
-   "span_id": "2aef4fee28bc4715",
-   "parent_span_id": "42d11c8f07214764",
-   "name": "POST /mcp",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1793863918042473929,
-   "end_time_unix_nano": 1793863918113736595,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "http.target": "/mcp",
-    "http.status_code": 200,
-    "http.method": "POST",
-    "http.response.status_code": 200
-   },
-   "resource": {
-    "service.name": "mcp-server",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
-   "span_id": "77216dc5ba5f96d2",
-   "parent_span_id": "2aef4fee28bc4715",
-   "name": "tools/list",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1793863918042922275,
-   "end_time_unix_nano": 1793863918043150184,
-   "status_code": "UNSET",
-   "status_description": null,
-   "attributes": {
-    "mcp.protocol.version": "2026-07-28",
-    "mcp.method.name": "tools/list",
-    "jsonrpc.request.id": "14"
-   },
-   "resource": {
-    "service.name": "mcp-server",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
-   "span_id": "aca5229acd1db42b",
-   "parent_span_id": "d86e92d54fd7b657",
-   "name": "tools/call retrieve_documents",
-   "kind": "SERVER",
-   "start_time_unix_nano": 1793863918043545983,
-   "end_time_unix_nano": 1793863918047540060,
-   "status_code": "ERROR",
-   "status_description": "consuming input failed: SSL error: unexpected eof while reading",
-   "attributes": {
-    "error.type": "OperationalError",
-    "gen_ai.operation.name": "execute_tool",
-    "gen_ai.tool.name": "retrieve_documents",
-    "mcp.protocol.version": "2026-07-28",
-    "mcp.method.name": "tools/call",
-    "jsonrpc.request.id": "14"
-   },
-   "resource": {
-    "service.name": "mcp-server",
-    "scenario.pitfalls": "none"
-   }
-  },
-  {
-   "trace_id": "6aec30ebc13e0bced0ed26d8d54818e8",
-   "span_id": "7e357005f8db04d9",
-   "parent_span_id": "aca5229acd1db42b",
-   "name": "SELECT documents",
-   "kind": "CLIENT",
-   "start_time_unix_nano": 1793863918043784804,
-   "end_time_unix_nano": 1793863918046275536,
-   "status_code": "ERROR",
-   "status_description": "OperationalError: consuming input failed: SSL error: unexpected eof while reading",
-   "attributes": {
-    "db.query.text": "SELECT id FROM documents ORDER BY embedding <-> %s LIMIT %s",
-    "db.collection.name": "documents",
-    "db.system.name": "postgresql",
-    "db.operation.name": "SELECT"
-   },
-   "resource": {
-    "service.name": "mcp-server",
-    "scenario.pitfalls": "none"
-   }
+   "scopeSpans": [
+    {
+     "spans": [
+      {
+       "traceId": "6aec30ebc13e0bced0ed26d8d54818e8",
+       "spanId": "2aef4fee28bc4715",
+       "parentSpanId": "42d11c8f07214764",
+       "name": "POST /mcp",
+       "kind": 2,
+       "startTimeUnixNano": "1793863918042473929",
+       "endTimeUnixNano": "1793863918113736595",
+       "attributes": [
+        {
+         "key": "http.target",
+         "value": {
+          "stringValue": "/mcp"
+         }
+        },
+        {
+         "key": "http.status_code",
+         "value": {
+          "intValue": "200"
+         }
+        },
+        {
+         "key": "http.method",
+         "value": {
+          "stringValue": "POST"
+         }
+        },
+        {
+         "key": "http.response.status_code",
+         "value": {
+          "intValue": "200"
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6aec30ebc13e0bced0ed26d8d54818e8",
+       "spanId": "77216dc5ba5f96d2",
+       "parentSpanId": "2aef4fee28bc4715",
+       "name": "tools/list",
+       "kind": 2,
+       "startTimeUnixNano": "1793863918042922275",
+       "endTimeUnixNano": "1793863918043150184",
+       "attributes": [
+        {
+         "key": "mcp.protocol.version",
+         "value": {
+          "stringValue": "2026-07-28"
+         }
+        },
+        {
+         "key": "mcp.method.name",
+         "value": {
+          "stringValue": "tools/list"
+         }
+        },
+        {
+         "key": "jsonrpc.request.id",
+         "value": {
+          "stringValue": "14"
+         }
+        }
+       ],
+       "status": {
+        "code": 0
+       }
+      },
+      {
+       "traceId": "6aec30ebc13e0bced0ed26d8d54818e8",
+       "spanId": "aca5229acd1db42b",
+       "parentSpanId": "d86e92d54fd7b657",
+       "name": "tools/call retrieve_documents",
+       "kind": 2,
+       "startTimeUnixNano": "1793863918043545983",
+       "endTimeUnixNano": "1793863918047540060",
+       "attributes": [
+        {
+         "key": "error.type",
+         "value": {
+          "stringValue": "OperationalError"
+         }
+        },
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "execute_tool"
+         }
+        },
+        {
+         "key": "gen_ai.tool.name",
+         "value": {
+          "stringValue": "retrieve_documents"
+         }
+        },
+        {
+         "key": "mcp.protocol.version",
+         "value": {
+          "stringValue": "2026-07-28"
+         }
+        },
+        {
+         "key": "mcp.method.name",
+         "value": {
+          "stringValue": "tools/call"
+         }
+        },
+        {
+         "key": "jsonrpc.request.id",
+         "value": {
+          "stringValue": "14"
+         }
+        }
+       ],
+       "status": {
+        "code": 2,
+        "message": "consuming input failed: SSL error: unexpected eof while reading"
+       }
+      },
+      {
+       "traceId": "6aec30ebc13e0bced0ed26d8d54818e8",
+       "spanId": "7e357005f8db04d9",
+       "parentSpanId": "aca5229acd1db42b",
+       "name": "SELECT documents",
+       "kind": 3,
+       "startTimeUnixNano": "1793863918043784804",
+       "endTimeUnixNano": "1793863918046275536",
+       "attributes": [
+        {
+         "key": "db.query.text",
+         "value": {
+          "stringValue": "SELECT id FROM documents ORDER BY embedding <-> %s LIMIT %s"
+         }
+        },
+        {
+         "key": "db.collection.name",
+         "value": {
+          "stringValue": "documents"
+         }
+        },
+        {
+         "key": "db.system.name",
+         "value": {
+          "stringValue": "postgresql"
+         }
+        },
+        {
+         "key": "db.operation.name",
+         "value": {
+          "stringValue": "SELECT"
+         }
+        }
+       ],
+       "status": {
+        "code": 2,
+        "message": "OperationalError: consuming input failed: SSL error: unexpected eof while reading"
+       }
+      }
+     ]
+    }
+   ]
   }
  ]
 }

@@ -1,6 +1,6 @@
 """Draw, for questions cut by the caller, how long the agent and its LLM calls
 kept going under each way of stopping, as a PNG for the README. One row per
-trace; the full span-by-span waterfall is the HTML next to each trace.
+trace; the full span-by-span waterfall is the PNG next to each trace (Jaeger's, README).
 
   python scripts/plot_cut.py docs/img/cut.png \
       何もしない=traces/disconnect/gpu3-cut.json \
@@ -14,14 +14,17 @@ second (DESIGN §7 20). The cut is placed by the caller's caller.cut_after_s,
 a duration on its own clock, after that start.
 """
 from __future__ import annotations
-import argparse, json
+import argparse, json, sys
 from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# Same colors as tracing/viewer/waterfall.py and plot_breakdown.py.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from tracing.published import from_otlp
+
+# Same colors as plot_breakdown.py.
 _AGENT = "#2a78d6"
 _LLM = "#eda100"
 _CUT = "#d0453b"
@@ -37,7 +40,7 @@ plt.rcParams["font.family"] = [f for f in ("Yu Gothic", "Meiryo", "Noto Sans CJK
 
 
 def _row(path: Path) -> dict:
-    spans = json.loads(path.read_text(encoding="utf-8"))["spans"]
+    spans = from_otlp(json.loads(path.read_text(encoding="utf-8")))
 
     def times(service: str, prefix: str) -> list[tuple[float, float]]:
         return sorted((s["start_time_unix_nano"] / 1e9, s["end_time_unix_nano"] / 1e9) for s in spans

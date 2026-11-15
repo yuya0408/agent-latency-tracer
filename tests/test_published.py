@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tracing.published import from_otel_document, mask_span
+from tracing.published import from_otel_document, from_otlp, mask_span, to_otlp
 
 _ACCOUNT = "123456789012"
 _ARN = f"arn:aws:bedrock-agentcore:ap-northeast-1:{_ACCOUNT}:runtime/agent-abc"
@@ -93,5 +93,15 @@ def test_kept_traces_are_already_masked():
     paths = sorted(Path(__file__).resolve().parents[1].joinpath("traces").rglob("*.json"))
     assert paths
     for path in paths:
-        for span in json.loads(path.read_text(encoding="utf-8"))["spans"]:
+        for span in from_otlp(json.loads(path.read_text(encoding="utf-8"))):
             assert mask_span(span) == span, f"{path.name}: {span['name']}"
+
+
+def test_otlp_round_trip_keeps_every_value():
+    span = mask_span(from_otel_document(_otel_document()))
+    span["attributes"].update({"vllm.prefix_cache_hit": True, "llm.ratio": 0.5, "gen_ai.response.finish_reasons": ["stop"]})
+    root = {**span, "span_id": "2222222222222222", "parent_span_id": None, "status_code": "UNSET", "status_description": None}
+    otlp = to_otlp([span, root])
+    assert len(otlp["resourceSpans"]) == 1  # same resource, one entry
+    assert otlp["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["kind"] == 2  # SERVER
+    assert from_otlp(json.loads(json.dumps(otlp))) == sorted([span, root], key=lambda s: s["start_time_unix_nano"])

@@ -1,7 +1,7 @@
 """Draw one question's time breakdown as a PNG, one lane per part (the
 agent, the LLM calls, the MCP tools, the Memory calls), from a trace under
-traces/. For the README; the full span-by-span waterfall is the HTML next to
-the trace.
+traces/. For the README; the full span-by-span waterfall is the PNG next to
+the trace (Jaeger's, README).
 
   python scripts/plot_breakdown.py traces/base/gpu4-q2.json docs/img/one-question.png
 
@@ -9,15 +9,16 @@ needs the "plot" extra. Times are taken from the agent's own spans, so the
 caller's clock (which can be off by up to a second, DESIGN §7 20) is not mixed in.
 """
 from __future__ import annotations
-import argparse, json
+import argparse, json, sys
 from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# Same colors as tracing/viewer/waterfall.py (light mode), so a part looks the
-# same in the PNG and in the HTML.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from tracing.published import from_otlp
+
 _LANES = [
     ("エージェント全体", "#2a78d6"),
     ("LLM", "#eda100"),
@@ -68,7 +69,7 @@ def main() -> None:
     parser.add_argument("png", type=Path)
     args = parser.parse_args()
 
-    spans = json.loads(args.trace.read_text(encoding="utf-8"))["spans"]
+    spans = from_otlp(json.loads(args.trace.read_text(encoding="utf-8")))
     lanes: dict[int, list[tuple[float, float]]] = {i: [] for i in range(len(_LANES))}
     for span in spans:
         lane = _lane(span)

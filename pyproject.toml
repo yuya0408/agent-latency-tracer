@@ -8,6 +8,8 @@ dependencies = [
     "opentelemetry-sdk>=1.27",
     # X-Ray-format trace IDs, so the CloudWatch console can open any trace
     "opentelemetry-sdk-extension-aws>=2.0",
+    # TRACE_TO=otlp (Jaeger locally); tracing/aws_exporter.py signs the same exporter for CloudWatch
+    "opentelemetry-exporter-otlp-proto-http>=1.27",
     "numpy>=1.25",
     "faiss-cpu>=1.9",
     # Pinned: v2 API, and the server-side OTel middleware is still provisional.
@@ -27,7 +29,6 @@ rds = [
 aws = [
     # tracing/aws_exporter.py: OTLP/HTTP to CloudWatch, signed with SigV4
     "botocore>=1.35",
-    "opentelemetry-exporter-otlp-proto-http>=1.27",
 ]
 
 plot = [
