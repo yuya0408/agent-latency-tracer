@@ -15,4 +15,8 @@ ADD https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /app/rds-c
 ENV MCP_SERVER_HOST=0.0.0.0 \
     TRACE_TO=cloudwatch
 EXPOSE 8000
+# Run as an unprivileged user, not root. Checked with local Docker; the runs
+# on AgentCore Runtime used the earlier image, which ran as root.
+RUN useradd --create-home app
+USER app
 CMD ["python", "-m", "system.mcp_server"]
