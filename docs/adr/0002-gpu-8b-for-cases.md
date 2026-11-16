@@ -35,7 +35,7 @@ LLMに要るのはツールを呼ぶ・複数頼む・止まることだけ」�
 ## 決定(Decision Outcome)
 
 - 段階5bを新しく設け、GPUのEC2を同じVPCに置き、エージェントもAgentCore Runtimeへ移す(ADR-0001)。
-- インスタンスとモデルは`toolcall-serving-bench`と同じg6.xlarge・Qwen3-8Bにし、そちらで組んだGPUの環境を流用する。
+- インスタンスとモデルは[toolcall-serving-bench](https://github.com/yuya0408/toolcall-serving-bench)と同じg6.xlarge・Qwen3-8Bにし、そちらで組んだGPUの環境を流用する。
   8Bはbf16でL4(24GB)に載る。
 - `toolcall-serving-bench`を先に終え、同じ月にGPUを回さない(予算の月60ドルを同じアカウントで分け合うため)。
 
