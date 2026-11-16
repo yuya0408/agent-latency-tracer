@@ -40,6 +40,47 @@ resource "aws_ecr_repository" "agent" {
   force_delete = true
 }
 
+# Each build is tagged with its commit and pushed by buildx as three images: an
+# index (tagged), the image and a provenance attestation (both untagged). Keep
+# the last three builds. ECR does not expire an image an index still refers
+# to, so the untagged rule only removes what an expired index left behind.
+resource "aws_ecr_lifecycle_policy" "keep_recent" {
+  for_each = {
+    vllm           = aws_ecr_repository.vllm.name
+    otel_collector = aws_ecr_repository.otel_collector.name
+    mcp_server     = aws_ecr_repository.mcp_server.name
+    agent          = aws_ecr_repository.agent.name
+  }
+  repository = each.value
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep the last three tagged builds"
+        selection = {
+          tagStatus      = "tagged"
+          tagPatternList = ["*"]
+          countType      = "imageCountMoreThan"
+          countNumber    = 3
+        }
+        action = { type = "expire" }
+      },
+      {
+        rulePriority = 2
+        description  = "Remove untagged images no index refers to"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 1
+        }
+        action = { type = "expire" }
+      },
+    ]
+  })
+}
+
 output "artifacts_bucket" {
   value = aws_s3_bucket.artifacts.bucket
 }
