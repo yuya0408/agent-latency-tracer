@@ -118,6 +118,9 @@ flowchart LR
 | `SELECT documents`(CLIENT) | 自作(同上) | `db.system.name`、`db.query.text`(値を含まない)、`db.response.returned_rows`、`retrieval.document_ids` / `scores` / `text_chars`(本文は残さない) |
 | `AgentCore.Runtime.Invoke`(SERVER) | AgentCoreの基盤 | `aws.operation.name`、`latency_ms`、`session.id`。エージェントとMCPサーバのRuntimeそれぞれに出る |
 
+- 属性の名前: `gen_ai.*`・`mcp.*`・`db.*`・`error.type`はOTelの規約(GenAI・MCP・DB)の名前。規約に無い値は、作る側の名前を接頭辞にした独自の属性にした
+  (`caller.*`・`agent.*`・`llm.*`・`llamacpp.*`・`vllm.*`・`retrieval.*`・`botocore.retry_attempts`)。例えばTTFTは、規約ではメトリクス(`gen_ai.server.time_to_first_token`)にしか無い。
+  `llamacpp.*`・`vllm.*`は推論サーバが返す内訳をそのまま写したもので、サーバを替えると無くなる
 - SDKのspanはグローバルのTracerProviderに送られる。登録しないと捨てられ、`traceparent`も送られない
   (`set_global_tracer_provider`)
 - HTTP越しでは`execute_tool` → `MCP send tools/call` → サーバの`tools/call`の3段が1本のトレースになる。

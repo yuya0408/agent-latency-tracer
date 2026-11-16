@@ -13,4 +13,8 @@ RUN pip install --no-cache-dir ".[aws]"
 ENV AGENT_SERVER_HOST=0.0.0.0 \
     TRACE_TO=cloudwatch
 EXPOSE 8080
+# Run as an unprivileged user, not root. Checked with local Docker; the runs
+# on AgentCore Runtime used the earlier image, which ran as root.
+RUN useradd --create-home app
+USER app
 CMD ["python", "-m", "system.agent_server"]
